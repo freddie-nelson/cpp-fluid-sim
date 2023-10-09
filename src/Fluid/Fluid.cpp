@@ -28,6 +28,7 @@ void Fluid::Fluid::init()
         p->position += options.initialCentre;
         p->position -= glm::vec2(gridOffset, gridOffset);
 
+        p->velocity = glm::vec2(0, 0);
         p->radius = options.particleRadius;
 
         particles.push_back(p);
@@ -36,6 +37,55 @@ void Fluid::Fluid::init()
 
 void Fluid::Fluid::update(float dt)
 {
+    applyGravity(dt);
+    applyVelocity(dt);
+    applyBoundingBox();
+}
+
+void Fluid::Fluid::applyGravity(float dt)
+{
+    for (Particle *p : particles)
+    {
+        p->velocity += options.gravity * dt;
+    }
+}
+
+void Fluid::Fluid::applyVelocity(float dt)
+{
+    for (Particle *p : particles)
+    {
+        p->position += p->velocity * dt;
+    }
+}
+
+void Fluid::Fluid::applyBoundingBox()
+{
+    for (auto p : particles)
+    {
+        if (p->position.x - p->radius < options.boundingBox.min.x)
+        {
+            p->position.x = options.boundingBox.min.x + p->radius;
+            p->velocity.x *= -options.boudingBoxRestitution;
+        }
+
+        if (p->position.x + p->radius > options.boundingBox.max.x)
+        {
+            p->position.x = options.boundingBox.max.x - p->radius;
+            p->velocity.x *= -options.boudingBoxRestitution;
+        }
+
+        if (p->position.y - p->radius < options.boundingBox.min.y)
+        {
+            p->position.y = options.boundingBox.min.y + p->radius;
+            p->velocity.y *= -options.boudingBoxRestitution;
+        }
+
+        if (p->position.y + p->radius > options.boundingBox.max.y)
+        {
+            p->position.y = options.boundingBox.max.y - p->radius;
+            p->velocity.y *= -options.boudingBoxRestitution;
+        }
+    }
 }
 
 std::vector<Fluid::Particle *> &Fluid::Fluid::getParticles()

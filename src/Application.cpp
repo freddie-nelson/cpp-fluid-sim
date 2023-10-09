@@ -28,7 +28,7 @@ int Application::run()
         return initCode;
     }
 
-    const int desiredFps = 60;
+    const int desiredFps = 120;
     const int desiredFrameTime = 1000 / desiredFps;
 
     auto lastUpdateTime = timeSinceEpochMillisec() - desiredFrameTime;
@@ -84,6 +84,14 @@ int Application::init()
         particleRadius : 10,
         particleSpacing : 5,
         initialCentre : glm::vec2(windowWidth / 2, windowHeight / 2),
+
+        gravity : glm::vec2(0, 150.0f),
+
+        boundingBox : Fluid::AABB{
+            min : glm::vec2(0, 0),
+            max : glm::vec2(windowWidth, windowHeight)
+        },
+        boudingBoxRestitution : 0.8f
     };
     fluid = new Fluid::Fluid(options);
     fluid->init();
@@ -99,6 +107,8 @@ void Application::destroy()
 
 void Application::update(float dt)
 {
+    fluid->update(dt);
+
     // print timestep info
     std::cout << "\rdt: " << dt << "          ";
 }
