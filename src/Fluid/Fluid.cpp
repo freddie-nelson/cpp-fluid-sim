@@ -1,6 +1,8 @@
 #include "../../include/Fluid/Fluid.h"
 
+#include <glm/glm.hpp>
 #include <math.h>
+#include <iostream>
 
 Fluid::Fluid::Fluid(FluidOptions &options) : options(options)
 {
@@ -37,9 +39,31 @@ void Fluid::Fluid::init()
 
 void Fluid::Fluid::update(float dt)
 {
+    updateGrid();
+
     applyGravity(dt);
     applyVelocity(dt);
     applyBoundingBox();
+}
+
+std::vector<Fluid::Particle *> &Fluid::Fluid::getParticles()
+{
+    return particles;
+}
+
+void Fluid::Fluid::clearParticles()
+{
+    for (Particle *p : particles)
+    {
+        delete p;
+    }
+
+    particles.clear();
+}
+
+Fluid::Grid &Fluid::Fluid::getGrid()
+{
+    return grid;
 }
 
 void Fluid::Fluid::applyGravity(float dt)
@@ -88,17 +112,75 @@ void Fluid::Fluid::applyBoundingBox()
     }
 }
 
-std::vector<Fluid::Particle *> &Fluid::Fluid::getParticles()
+std::vector<Fluid::Particle *> Fluid::Fluid::getParticlesOfInfluence(Particle *p)
 {
-    return particles;
-}
+    float smoothingRadiusSqr = options.smoothingRadius * options.smoothingRadius;
+    auto &key = p->gridKey;
 
-void Fluid::Fluid::clearParticles()
-{
-    for (Particle *p : particles)
+    std::vector<Particle *> close;
+
+    // add all particles in the same cell
+    // no need to check if they're in range
+    // since they're in the same cell
+    // so must be within smoothing radius
+    for (Particle *q : grid[key])
     {
-        delete p;
+        close.push_back(q);
     }
 
-    particles.clear();
+    for (int xOff = -1; xOff <= 1; ++xOff)
+    {
+        for (int yOff = -1; yOff <= 1; ++yOff)
+        {
+            // skip if we're in the same cell
+            if (xOff == 0 && yOff == 0)
+                continue;
+
+            auto gridKey = std::make_pair(key.first + xOff, key.second + yOff);
+            if (grid.count(gridKey) == 0)
+                continue;
+
+            for (Particle *q : grid[gridKey])
+            {
+                auto temp = p->position - q->position;
+                if (glm::dot(temp, temp) < smoothingRadiusSqr)
+                {
+                    close.push_back(q);
+                }
+            }
+        }
+    }
+
+    return close;
+}
+
+void Fluid::Fluid::updateGrid()
+{
+    grid.clear();
+
+    for (Particle *p : particles)
+    {
+        insertIntoGrid(p);
+    }
+}
+
+void Fluid::Fluid::insertIntoGrid(Particle *p)
+{
+    p->gridKey = getGridKey(p);
+
+    if (grid.count(p->gridKey) == 0)
+        grid[p->gridKey] = std::vector<Particle *>();
+
+    grid[p->gridKey].push_back(p);
+}
+
+std::pair<int, int> Fluid::Fluid::getGridKey(Particle *p)
+{
+    int cellWidth = options.smoothingRadius;
+    int cellHeight = options.smoothingRadius;
+
+    int x = (p->position.x - options.boundingBox.min.x) / cellWidth;
+    int y = (p->position.y - options.boundingBox.min.y) / cellHeight;
+
+    return std::make_pair(x, y);
 }

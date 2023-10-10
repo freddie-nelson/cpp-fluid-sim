@@ -91,8 +91,11 @@ int Application::init()
             min : glm::vec2(0, 0),
             max : glm::vec2(windowWidth, windowHeight)
         },
-        boudingBoxRestitution : 0.8f
+        boudingBoxRestitution : 0.8f,
+
+        smoothingRadius : 50.0f,
     };
+
     fluid = new Fluid::Fluid(options);
     fluid->init();
 
@@ -124,6 +127,33 @@ void Application::render(bool clear)
     {
         renderer->circle(Rendering::Circle{p->position, p->radius},
                          Rendering::Color{0, 0, 255, 255});
+    }
+
+    if (Globals::DEBUG_MODE)
+    {
+        // draw bounding box
+        glm::vec2 bbPosition(options.boundingBox.min.x, options.boundingBox.min.y);
+        float bbW = options.boundingBox.max.x - options.boundingBox.min.x;
+        float bbH = options.boundingBox.max.y - options.boundingBox.min.y;
+
+        renderer->rect(Rendering::Rect{bbPosition, bbW, bbH},
+                       Rendering::Color{0, 255, 0, 255}, Rendering::RenderType::STROKE);
+
+        // draw grid
+        for (auto &kv : fluid->getGrid())
+        {
+            auto key = kv.first;
+            auto particles = kv.second;
+
+            glm::vec2 position(key.first * options.smoothingRadius, key.second * options.smoothingRadius);
+            position += bbPosition;
+
+            float w = options.smoothingRadius;
+            float h = options.smoothingRadius;
+
+            renderer->rect(Rendering::Rect{position, w, h},
+                           Rendering::Color{255, 0, 0, 75}, Rendering::RenderType::STROKE);
+        }
     }
 
     // render
