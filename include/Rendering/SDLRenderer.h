@@ -7,6 +7,11 @@
 namespace Rendering
 {
 
+    /**
+     * SDL implementation of the Renderer.
+     *
+     * The SDL Renderer will not draw filled shapes.
+     */
     class SDLRenderer : public Renderer
     {
     public:
@@ -22,9 +27,9 @@ namespace Rendering
         void present();
 
         void line(glm::vec2 start, glm::vec2 end, const Color &color);
-        void circle(const Circle &circle, const Color &color);
-        void rect(const Rect &rect, const Color &color);
-        void polygon(const std::vector<glm::vec2> &vertices, const Color &color);
+        void circle(const Circle &circle, const Color &color, RenderType renderType = RenderType::FILL);
+        void rect(const Rect &rect, const Color &color, RenderType renderType = RenderType::FILL);
+        void polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType = RenderType::FILL);
 
     private:
         SDL_Renderer *renderer;

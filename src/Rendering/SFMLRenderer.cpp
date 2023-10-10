@@ -61,29 +61,62 @@ void Rendering::SFMLRenderer::line(glm::vec2 start, glm::vec2 end, const Color &
     window->draw(line, 2, sf::Lines);
 }
 
-void Rendering::SFMLRenderer::circle(const Circle &circle, const Color &color)
+void Rendering::SFMLRenderer::circle(const Circle &circle, const Color &color, RenderType renderType = RenderType::FILL)
 {
     sf::CircleShape shape(circle.radius);
     shape.setPointCount(50);
-    shape.setFillColor(sf::Color(color.r, color.g, color.b, color.a));
     shape.setPosition(circle.centre.x - circle.radius, circle.centre.y - circle.radius);
 
+    sf::Color c(color.r, color.g, color.b, color.a);
+    if (renderType == RenderType::FILL)
+    {
+        shape.setFillColor(c);
+    }
+    else if (renderType == RenderType::STROKE)
+    {
+        shape.setOutlineColor(sf::Color(color.r, color.g, color.b, color.a));
+        shape.setOutlineThickness(1);
+        shape.setFillColor(sf::Color::Transparent);
+    }
+
     window->draw(shape);
 };
 
-void Rendering::SFMLRenderer::rect(const Rect &rect, const Color &color)
+void Rendering::SFMLRenderer::rect(const Rect &rect, const Color &color, RenderType renderType = RenderType::FILL)
 {
     sf::RectangleShape shape(sf::Vector2f(rect.w, rect.h));
-    shape.setFillColor(sf::Color(color.r, color.g, color.b, color.a));
     shape.setPosition(rect.topLeft.x, rect.topLeft.y);
+
+    sf::Color c(color.r, color.g, color.b, color.a);
+    if (renderType == RenderType::FILL)
+    {
+        shape.setFillColor(c);
+    }
+    else if (renderType == RenderType::STROKE)
+    {
+        shape.setOutlineColor(sf::Color(color.r, color.g, color.b, color.a));
+        shape.setOutlineThickness(1);
+        shape.setFillColor(sf::Color::Transparent);
+    }
 
     window->draw(shape);
 };
 
-void Rendering::SFMLRenderer::polygon(const std::vector<glm::vec2> &vertices, const Color &color)
+void Rendering::SFMLRenderer::polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType = RenderType::FILL)
 {
     sf::ConvexShape shape(vertices.size());
-    shape.setFillColor(sf::Color(color.r, color.g, color.b, color.a));
+
+    sf::Color c(color.r, color.g, color.b, color.a);
+    if (renderType == RenderType::FILL)
+    {
+        shape.setFillColor(c);
+    }
+    else if (renderType == RenderType::STROKE)
+    {
+        shape.setOutlineColor(sf::Color(color.r, color.g, color.b, color.a));
+        shape.setOutlineThickness(1);
+        shape.setFillColor(sf::Color::Transparent);
+    }
 
     for (int i = 0; i < vertices.size(); i++)
     {
