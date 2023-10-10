@@ -61,7 +61,7 @@ void Rendering::SFMLRenderer::line(glm::vec2 start, glm::vec2 end, const Color &
     window->draw(line, 2, sf::Lines);
 }
 
-void Rendering::SFMLRenderer::circle(const Circle &circle, const Color &color, RenderType renderType = RenderType::FILL)
+void Rendering::SFMLRenderer::circle(const Circle &circle, const Color &color, RenderType renderType)
 {
     sf::CircleShape shape(circle.radius);
     shape.setPointCount(50);
@@ -82,7 +82,7 @@ void Rendering::SFMLRenderer::circle(const Circle &circle, const Color &color, R
     window->draw(shape);
 };
 
-void Rendering::SFMLRenderer::rect(const Rect &rect, const Color &color, RenderType renderType = RenderType::FILL)
+void Rendering::SFMLRenderer::rect(const Rect &rect, const Color &color, RenderType renderType)
 {
     sf::RectangleShape shape(sf::Vector2f(rect.w, rect.h));
     shape.setPosition(rect.topLeft.x, rect.topLeft.y);
@@ -102,7 +102,7 @@ void Rendering::SFMLRenderer::rect(const Rect &rect, const Color &color, RenderT
     window->draw(shape);
 };
 
-void Rendering::SFMLRenderer::polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType = RenderType::FILL)
+void Rendering::SFMLRenderer::polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType)
 {
     sf::ConvexShape shape(vertices.size());
 

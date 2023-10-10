@@ -65,7 +65,7 @@ void Rendering::SDLRenderer::line(glm::vec2 start, glm::vec2 end, const Color &c
     SDL_RenderDrawLine(renderer, start.x, start.y, end.x, end.y);
 }
 
-void Rendering::SDLRenderer::circle(const Circle &circle, const Color &color, RenderType renderType = RenderType::FILL)
+void Rendering::SDLRenderer::circle(const Circle &circle, const Color &color, RenderType renderType)
 {
     const int cx = std::floor(circle.centre[0]);
     const int cy = std::floor(circle.centre[1]);
@@ -108,7 +108,7 @@ void Rendering::SDLRenderer::circle(const Circle &circle, const Color &color, Re
     }
 };
 
-void Rendering::SDLRenderer::rect(const Rect &rect, const Color &color, RenderType renderType = RenderType::FILL)
+void Rendering::SDLRenderer::rect(const Rect &rect, const Color &color, RenderType renderType)
 {
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
 
@@ -122,7 +122,7 @@ void Rendering::SDLRenderer::rect(const Rect &rect, const Color &color, RenderTy
     SDL_RenderDrawRect(renderer, &sdlRect);
 };
 
-void Rendering::SDLRenderer::polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType = RenderType::FILL)
+void Rendering::SDLRenderer::polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType)
 {
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
 
