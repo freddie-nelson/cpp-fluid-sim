@@ -44,18 +44,32 @@ int Application::run()
         const float dt = (float)diff / 1000.0f;
 
         // wait for renderer events to be processed
+        auto startTime = timeSinceEpochMillisec();
         const bool shouldExit = renderer->pollEvents();
         if (shouldExit)
         {
             state = ApplicationState::EXIT;
             break;
         }
+        auto eventTime = timeSinceEpochMillisec() - startTime;
 
         // clear renderer first so that update functions can draw to the screen
         // renderer->clear();
 
+        startTime = timeSinceEpochMillisec();
         update(dt);
+        auto updateTime = timeSinceEpochMillisec() - startTime;
+
+        startTime = timeSinceEpochMillisec();
         render();
+        auto renderTime = timeSinceEpochMillisec() - startTime;
+
+        // print timestep info
+        std::cout << "\rdt: " << dt
+                  << " | events: " << eventTime << "ms"
+                  << " | update: " << updateTime << "ms"
+                  << " | render: " << renderTime << "ms"
+                  << " | fps: " << 1.0f / dt << "        ";
 
         // wait until frame time is reached
         const auto frameEndTime = now + desiredFrameTime;
@@ -80,20 +94,24 @@ int Application::init()
 
     // init fluid
     options = Fluid::FluidOptions{
-        numParticles : 20 * 20,
+        numParticles : 400,
         particleRadius : 10,
         particleSpacing : 5,
         initialCentre : glm::vec2(windowWidth / 2, windowHeight / 2),
 
-        gravity : glm::vec2(0, 150.0f),
+        gravity : glm::vec2(0, 120.0f),
 
         boundingBox : Fluid::AABB{
             min : glm::vec2(0, 0),
             max : glm::vec2(windowWidth, windowHeight)
         },
-        boudingBoxRestitution : 0.8f,
+        boudingBoxRestitution : 0.7f,
 
-        smoothingRadius : 50.0f,
+        smoothingRadius : 100.0f,
+        stiffness : 10000.0f,
+        desiredRestDensity : 0.0001f,
+        particleMass : 10.0f,
+        viscosity : 1.0f
     };
 
     fluid = new Fluid::Fluid(options);
@@ -111,9 +129,6 @@ void Application::destroy()
 void Application::update(float dt)
 {
     fluid->update(dt);
-
-    // print timestep info
-    std::cout << "\rdt: " << dt << "          ";
 }
 
 void Application::render(bool clear)
@@ -153,6 +168,19 @@ void Application::render(bool clear)
 
             renderer->rect(Rendering::Rect{position, w, h},
                            Rendering::Color{255, 0, 0, 75}, Rendering::RenderType::STROKE);
+        }
+
+        // draw neighbours of particle 0
+        auto p = fluid->getParticles()[0];
+        auto neighbours = p->neighbours;
+        // std::cout << "particle 0 neighbours count: " << neighbours.size() << std::endl;
+
+        for (auto n : neighbours)
+        {
+            glm::vec2 nPosition = n.particle->position;
+            nPosition += bbPosition;
+
+            renderer->line(p->position, nPosition, Rendering::Color{255, 255, 255, 255});
         }
     }
 

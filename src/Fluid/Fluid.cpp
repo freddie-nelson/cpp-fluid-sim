@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <math.h>
 #include <iostream>
+#include <numbers>
 
 Fluid::Fluid::Fluid(FluidOptions &options) : options(options)
 {
@@ -32,6 +33,12 @@ void Fluid::Fluid::init()
 
         p->velocity = glm::vec2(0, 0);
         p->radius = options.particleRadius;
+        p->mass = options.particleMass;
+
+        p->density = 0;
+        p->pressure = 0;
+        p->pressureForce = glm::vec2(0, 0);
+        p->viscosityForce = glm::vec2(0, 0);
 
         particles.push_back(p);
     }
@@ -41,7 +48,23 @@ void Fluid::Fluid::update(float dt)
 {
     updateGrid();
 
+    // solve
+
+    // precompute neighbours
+    for (auto p : particles)
+    {
+        p->neighbours = getParticlesOfInfluence(p);
+        // std::cout << p->neighbours.size() << std::endl;
+    }
+
+    solveDensity();
+    solvePressure();
+    solvePressureForce();
+    solveViscosityForce();
+
+    // apply forces
     applyGravity(dt);
+    applySPHForces(dt);
     applyVelocity(dt);
     applyBoundingBox();
 }
@@ -53,7 +76,7 @@ std::vector<Fluid::Particle *> &Fluid::Fluid::getParticles()
 
 void Fluid::Fluid::clearParticles()
 {
-    for (Particle *p : particles)
+    for (auto p : particles)
     {
         delete p;
     }
@@ -68,15 +91,34 @@ Fluid::Grid &Fluid::Fluid::getGrid()
 
 void Fluid::Fluid::applyGravity(float dt)
 {
-    for (Particle *p : particles)
+    for (auto p : particles)
     {
         p->velocity += options.gravity * dt;
     }
 }
 
+void Fluid::Fluid::applySPHForces(float dt)
+{
+    for (auto p : particles)
+    {
+        if (p->density == 0 || p->pressure == 0)
+        {
+            // std::cout << "density is 0" << std::endl;
+            continue;
+        }
+
+        p->velocity += ((p->pressureForce + p->viscosityForce) / p->density) * dt;
+
+        // std::cout << p->pressure << std::endl;
+        // std::cout << p->density << std::endl;
+        // std::cout << p->pressureForce.x << ", " << p->pressureForce.y << std::endl;
+        // std::cout << p->viscosityForce.x << ", " << p->viscosityForce.y << std::endl;
+    }
+}
+
 void Fluid::Fluid::applyVelocity(float dt)
 {
-    for (Particle *p : particles)
+    for (auto p : particles)
     {
         p->position += p->velocity * dt;
     }
@@ -112,12 +154,70 @@ void Fluid::Fluid::applyBoundingBox()
     }
 }
 
-std::vector<Fluid::Particle *> Fluid::Fluid::getParticlesOfInfluence(Particle *p)
+void Fluid::Fluid::solveDensity()
+{
+    for (auto p : particles)
+    {
+        p->density = 0;
+
+        for (auto q : p->neighbours)
+        {
+            p->density += q.particle->mass * smoothingKernelPoly6.calculate(&q.distance, options.smoothingRadius);
+            // std::cout << q.distance.distance << std::endl;
+        }
+    }
+}
+
+void Fluid::Fluid::solvePressure()
+{
+    for (auto p : particles)
+    {
+        p->pressure = options.stiffness * (p->density - options.desiredRestDensity);
+    }
+}
+
+void Fluid::Fluid::solvePressureForce()
+{
+    for (auto p : particles)
+    {
+        p->pressureForce = glm::vec2(0, 0);
+
+        for (auto q : p->neighbours)
+        {
+            if (q.particle->density == 0)
+                continue;
+
+            p->pressureForce += q.particle->mass * ((p->pressure + q.particle->pressure) / (2 * q.particle->density)) * smoothingKernelSpiky.calculateGradient(&q.distance, options.smoothingRadius);
+        }
+
+        p->pressureForce *= -1;
+    }
+}
+
+void Fluid::Fluid::solveViscosityForce()
+{
+    for (auto p : particles)
+    {
+        p->viscosityForce = glm::vec2(0, 0);
+
+        for (auto q : p->neighbours)
+        {
+            if (q.particle->density == 0)
+                continue;
+
+            p->viscosityForce += q.particle->mass * ((q.particle->velocity - p->velocity) / q.particle->density) * smoothingKernelViscosity.calculateLaplacian(&q.distance, options.smoothingRadius);
+        }
+
+        p->viscosityForce *= options.viscosity;
+    }
+}
+
+std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Particle *p)
 {
     float smoothingRadiusSqr = options.smoothingRadius * options.smoothingRadius;
     auto &key = p->gridKey;
 
-    std::vector<Particle *> close;
+    std::vector<ParticleNeighbour> close;
 
     // add all particles in the same cell
     // no need to check if they're in range
@@ -125,7 +225,16 @@ std::vector<Fluid::Particle *> Fluid::Fluid::getParticlesOfInfluence(Particle *p
     // so must be within smoothing radius
     for (Particle *q : grid[key])
     {
-        close.push_back(q);
+        if (p == q)
+            continue;
+
+        close.push_back(ParticleNeighbour{
+            q,
+            ParticleDistance{
+                glm::distance(p->position, q->position),
+                glm::normalize(p->position - q->position),
+            },
+        });
     }
 
     for (int xOff = -1; xOff <= 1; ++xOff)
@@ -145,7 +254,13 @@ std::vector<Fluid::Particle *> Fluid::Fluid::getParticlesOfInfluence(Particle *p
                 auto temp = p->position - q->position;
                 if (glm::dot(temp, temp) < smoothingRadiusSqr)
                 {
-                    close.push_back(q);
+                    close.push_back(ParticleNeighbour{
+                        q,
+                        ParticleDistance{
+                            glm::distance(p->position, q->position),
+                            glm::normalize(temp),
+                        },
+                    });
                 }
             }
         }

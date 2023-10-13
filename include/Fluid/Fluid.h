@@ -2,6 +2,9 @@
 
 #include "./Particle.h"
 #include "./AABB.h"
+#include "./SmoothingKernel/SmoothingKernelPoly6.h"
+#include "./SmoothingKernel/SmoothingKernelSpiky.h"
+#include "./SmoothingKernel/SmoothingKernelViscosity.h"
 
 #include <vector>
 #include <unordered_map>
@@ -22,6 +25,10 @@ namespace Fluid
         float boudingBoxRestitution;
 
         float smoothingRadius;
+        float stiffness;
+        float desiredRestDensity;
+        float particleMass;
+        float viscosity;
     };
 
     using Grid = std::unordered_map<std::pair<int, int>, std::vector<Particle *>, boost::hash<std::pair<int, int>>>;
@@ -42,11 +49,17 @@ namespace Fluid
 
     private:
         void applyGravity(float dt);
+        void applySPHForces(float dt);
         void applyVelocity(float dt);
 
         void applyBoundingBox();
 
-        std::vector<Particle *> getParticlesOfInfluence(Particle *p);
+        void solveDensity();
+        void solvePressure();
+        void solvePressureForce();
+        void solveViscosityForce();
+
+        std::vector<ParticleNeighbour> getParticlesOfInfluence(Particle *p);
 
         void updateGrid();
         void insertIntoGrid(Particle *p);
@@ -56,5 +69,9 @@ namespace Fluid
         std::vector<Particle *> particles;
 
         Grid grid;
+
+        SmoothingKernelPoly6 smoothingKernelPoly6;
+        SmoothingKernelSpiky smoothingKernelSpiky;
+        SmoothingKernelViscosity smoothingKernelViscosity;
     };
 }
