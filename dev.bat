@@ -1,4 +1,4 @@
-CALL prod.bat %1
+CALL prod.bat
 
 cd build
 main.exe
