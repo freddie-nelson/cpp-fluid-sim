@@ -36,4 +36,17 @@ private:
 
     void update(float dt);
     void render(bool clear = true);
+
+    bool paused = true;
+    bool stepSimulation = false;
+    std::string selectedOption = "";
+    void addSimulationControls();
+
+    glm::vec2 mousePos;
+    bool leftMouseDown = false;
+    Fluid::FluidAttractor *attractor = nullptr;
+
+    void createFluidInteractionListener();
+
+    void createGui();
 };

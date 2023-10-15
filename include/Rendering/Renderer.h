@@ -8,6 +8,7 @@
 #include <SFML/Graphics.hpp>
 #include <string>
 #include <vector>
+#include <functional>
 
 namespace Rendering
 {
@@ -78,6 +79,12 @@ namespace Rendering
          * @param color The color of the polygon.
          */
         void polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType = RenderType::FILL);
+
+        // gui methods
+
+        void createLabel(std::string text, glm::vec2 position, glm::vec2 size);
+        void createButton(std::string text, glm::vec2 position, glm::vec2 size, std::function<void()> onClickCallback);
+        void createSlider(glm::vec2 position, glm::vec2 size, float min, float max, float value, std::function<void(float)> onChangeCallback);
 
     protected:
         std::string windowTitle;

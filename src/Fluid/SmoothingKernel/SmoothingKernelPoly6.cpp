@@ -8,12 +8,13 @@ float Fluid::SmoothingKernelPoly6::calculate(ParticleDistance *distance, float s
     float r = distance->distance;
     float h = smoothingRadius;
 
-    if (r <= 0 || r >= h)
-        return 0.0f;
+    // if (r <= 0.0f || r >= h)
+    //     return 0.0f;
 
-    float constant = 315 / (64 * std::numbers::pi * std::pow(h, 9));
+    float volume = (std::numbers::pi * std::pow(h, 8)) / 4.0f;
+    float value = std::fmax(0.0f, std::pow(h, 2) - std::pow(r, 2));
 
-    return constant * std::pow(std::pow(h, 2) - std::pow(r, 2), 3);
+    return std::pow(value, 3) / volume;
 }
 
 glm::vec2 Fluid::SmoothingKernelPoly6::calculateGradient(ParticleDistance *distance, float smoothingRadius)
@@ -21,24 +22,15 @@ glm::vec2 Fluid::SmoothingKernelPoly6::calculateGradient(ParticleDistance *dista
     float r = distance->distance;
     float h = smoothingRadius;
 
-    if (r <= 0 || r >= h)
+    if (r >= h)
         return glm::vec2(0, 0);
 
-    float constant = -(945 / (32 * std::numbers::pi * std::pow(h, 9)));
-    float scaling = constant * (r * std::pow(std::pow(h, 2) - std::pow(r, 2), 2));
-
-    return scaling * distance->direction;
+    float f = std::pow(h, 2) - std::pow(r, 2);
+    float scale = -24 / (std::numbers::pi * std::pow(h, 8));
+    return scale * r * static_cast<float>(std::pow(f, 2)) * distance->direction;
 }
 
 float Fluid::SmoothingKernelPoly6::calculateLaplacian(ParticleDistance *distance, float smoothingRadius)
 {
-    float r = distance->distance;
-    float h = smoothingRadius;
-
-    if (r <= 0 || r >= h)
-        return 0.0f;
-
-    float constant = -(945 / (32 * std::numbers::pi * std::pow(h, 9)));
-
-    return constant * (5 * std::pow(r, 4) - 6 * std::pow(h, 2) * std::pow(r, 2) + std::pow(h, 4));
+    return 0.0f;
 }

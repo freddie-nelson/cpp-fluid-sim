@@ -3,38 +3,41 @@
 #include <string>
 #include <bits/stdc++.h>
 
-template <typename T>
+template <typename E, typename D>
 class EventEmitter
 {
 public:
     EventEmitter();
 
-    void on(std::string event, std::function<void(T)> listener);
-    void emit(std::string event, T data);
+    void on(E event, std::function<void(D)> listener);
+    void emit(E event, D data);
 
 private:
-    std::map<std::string, std::vector<std::function<void(T)>>> listeners;
+    std::map<E, std::vector<std::function<void(D)>>> listeners;
 };
 
-template <typename T>
-EventEmitter<T>::EventEmitter()
+template <typename E, typename D>
+EventEmitter<E, D>::EventEmitter()
 {
 }
 
-template <typename T>
-void EventEmitter<T>::on(std::string event, std::function<void(T)> listener)
+template <typename E, typename D>
+void EventEmitter<E, D>::on(E event, std::function<void(D)> listener)
 {
-    if (!listeners[event])
+    if (listeners.count(event) == 0)
     {
-        listeners[event] = std::vector<std::function<void(T)>>();
+        listeners[event] = std::vector<std::function<void(D)>>();
     }
 
     listeners[event].push_back(listener);
 }
 
-template <typename T>
-void EventEmitter<T>::emit(std::string event, T data)
+template <typename E, typename D>
+void EventEmitter<E, D>::emit(E event, D data)
 {
+    if (listeners.count(event) == 0)
+        return;
+
     for (auto listener : listeners[event])
     {
         listener(data);

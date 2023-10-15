@@ -1,8 +1,8 @@
 #include "../include/Application.h"
-// #include "../include/Rendering/SDLRenderer.h"
-#include "../include/Rendering/SFMLRenderer.h"
+#include "../include/Rendering/Renderer.h"
 #include "../include/Globals.h"
 #include "../include/Utility/Timestep.h"
+#include "../include/Utility/InputCodes.h"
 
 #include <math.h>
 #include <random>
@@ -30,6 +30,7 @@ int Application::run()
 
     const int desiredFps = 120;
     const int desiredFrameTime = 1000 / desiredFps;
+    const float desiredDt = 1.0f / static_cast<float>(desiredFps);
 
     auto lastUpdateTime = timeSinceEpochMillisec() - desiredFrameTime;
 
@@ -57,7 +58,7 @@ int Application::run()
         // renderer->clear();
 
         startTime = timeSinceEpochMillisec();
-        update(dt);
+        update(desiredDt);
         auto updateTime = timeSinceEpochMillisec() - startTime;
 
         startTime = timeSinceEpochMillisec();
@@ -85,7 +86,7 @@ int Application::run()
 int Application::init()
 {
     // init renderer
-    renderer = new Rendering::SFMLRenderer(windowTitle, windowWidth, windowHeight);
+    renderer = new Rendering::Renderer(windowTitle, windowWidth, windowHeight);
     if (renderer->init() != 0)
     {
         std::cout << "Failed to initialize renderer." << std::endl;
@@ -94,28 +95,37 @@ int Application::init()
 
     // init fluid
     options = Fluid::FluidOptions{
-        numParticles : 400,
-        particleRadius : 10,
+        numParticles : 300,
+        particleRadius : 5,
         particleSpacing : 5,
         initialCentre : glm::vec2(windowWidth / 2, windowHeight / 2),
 
-        gravity : glm::vec2(0, 120.0f),
+        gravity : glm::vec2(0, 0.0f),
 
         boundingBox : Fluid::AABB{
             min : glm::vec2(0, 0),
             max : glm::vec2(windowWidth, windowHeight)
         },
-        boudingBoxRestitution : 0.7f,
+        boudingBoxRestitution : 0.3f,
 
-        smoothingRadius : 100.0f,
+        smoothingRadius : 60.0f,
         stiffness : 10000.0f,
         desiredRestDensity : 0.0001f,
-        particleMass : 10.0f,
-        viscosity : 1.0f
+        particleMass : 1.0f,
+        viscosity : 0.0f,
+        surfaceTension : 0.0f,
+        surfaceTensionThreshold : 0.0f
     };
 
     fluid = new Fluid::Fluid(options);
     fluid->init();
+
+    // add event listeners
+    addSimulationControls();
+    createFluidInteractionListener();
+
+    // create gui
+    // createGui();
 
     return 0;
 }
@@ -128,7 +138,11 @@ void Application::destroy()
 
 void Application::update(float dt)
 {
-    fluid->update(dt);
+    if (!paused || stepSimulation)
+    {
+        stepSimulation = false;
+        fluid->update(dt);
+    }
 }
 
 void Application::render(bool clear)
@@ -140,9 +154,29 @@ void Application::render(bool clear)
     // draw particles
     for (auto p : fluid->getParticles())
     {
-        renderer->circle(Rendering::Circle{p->position, p->radius},
-                         Rendering::Color{0, 0, 255, 255});
+        auto color = Rendering::Color{255, 255, 255, 255};
+        float densityError = std::abs(p->density - options.desiredRestDensity);
+        float densityErrorRatio = densityError / options.desiredRestDensity;
+        float value = 255.0f * densityErrorRatio;
+        int valueInt = static_cast<int>(value);
+        int flippedValueInt = 255 - valueInt;
+
+        if (p->density > options.desiredRestDensity)
+        {
+            color = Rendering::Color{255, 0, 0, valueInt};
+        }
+        else if (p->density < options.desiredRestDensity)
+        {
+            color = Rendering::Color{0, 0, 255, valueInt};
+        }
+
+        renderer->circle(Rendering::Circle{p->position, p->radius}, Rendering::Color{255, 255, 255, 255});
+        renderer->circle(Rendering::Circle{p->position, p->radius}, color);
     }
+
+    // draw attractor
+    renderer->circle(Rendering::Circle{attractor->position, attractor->radius},
+                     Rendering::Color{255, 255, 255, 255}, Rendering::RenderType::STROKE);
 
     if (Globals::DEBUG_MODE)
     {
@@ -186,4 +220,126 @@ void Application::render(bool clear)
 
     // render
     renderer->present();
+}
+
+void Application::addSimulationControls()
+{
+    renderer->on(Rendering::RendererEventType::KEY_UP,
+                 [&](Rendering::RendererEvent event)
+                 {
+                     auto keyCode = *static_cast<Utility::KeyCode *>(event.data);
+
+                     if (keyCode == Utility::KeyCode::KEY_SPACE)
+                     {
+                         paused = !paused;
+                     }
+                 });
+
+    renderer->on(Rendering::RendererEventType::KEY_UP,
+                 [&](Rendering::RendererEvent event)
+                 {
+                     auto keyCode = *static_cast<Utility::KeyCode *>(event.data);
+
+                     if (keyCode == Utility::KeyCode::KEY_RIGHT)
+                     {
+                         stepSimulation = true;
+                     }
+                     else if (keyCode == Utility::KeyCode::KEY_R)
+                     {
+                         delete fluid;
+
+                         fluid = new Fluid::Fluid(options);
+                         fluid->init();
+                     }
+                     else if (keyCode == Utility::KeyCode::KEY_D)
+                     {
+                         Globals::DEBUG_MODE = !Globals::DEBUG_MODE;
+                     }
+                     else if (keyCode == Utility::KeyCode::KEY_S)
+                     {
+                         std::cout << "[OPTION SELECTED]: stiffness" << std::endl;
+                         selectedOption = "stiffness";
+                     }
+                     else if (keyCode == Utility::KeyCode::KEY_P)
+                     {
+                         std::cout << "[OPTION SELECTED]: particles" << std::endl;
+                         selectedOption = "particles";
+                     }
+                     else if (keyCode == Utility::KeyCode::KEY_UP || keyCode == Utility::KeyCode::KEY_DOWN)
+                     {
+                         int sign = keyCode == Utility::KeyCode::KEY_UP ? 1 : -1;
+
+                         if (selectedOption == "stiffness")
+                         {
+                             options.stiffness += 1000.0f * sign;
+                             std::cout << "[STIFFNESS]: " << options.stiffness << std::endl;
+                         }
+                         else if (selectedOption == "particles")
+                         {
+                             options.numParticles += 10 * sign;
+                             std::cout << "[PARTICLES]: " << options.numParticles << std::endl;
+                         }
+                     }
+                 });
+}
+
+void Application::createFluidInteractionListener()
+{
+    float radius = 150.0f;
+
+    attractor = new Fluid::FluidAttractor{
+        position : glm::vec2(0, 0),
+        radius : radius,
+        strength : options.stiffness * (radius / 5.0f),
+    };
+
+    renderer->on(Rendering::RendererEventType::MOUSE_DOWN,
+                 [&](Rendering::RendererEvent event)
+                 {
+                     auto mouseButton = *static_cast<Utility::MouseButton *>(event.data);
+
+                     if (mouseButton == Utility::MouseButton::MOUSE_LEFT)
+                     {
+                         leftMouseDown = true;
+                         fluid->addAttractor(attractor);
+                     }
+                 });
+
+    renderer->on(Rendering::RendererEventType::MOUSE_UP,
+                 [&](Rendering::RendererEvent event)
+                 {
+                     auto mouseButton = *static_cast<Utility::MouseButton *>(event.data);
+
+                     if (mouseButton == Utility::MouseButton::MOUSE_LEFT)
+                     {
+                         leftMouseDown = false;
+                         fluid->removeAttractor(attractor);
+                     }
+                 });
+
+    renderer->on(Rendering::RendererEventType::MOUSE_MOVE,
+                 [&](Rendering::RendererEvent event)
+                 {
+                     mousePos = *static_cast<glm::vec2 *>(event.data);
+                     attractor->position = mousePos;
+                 });
+}
+
+void Application::createGui()
+{
+    int guiWidth = 200;
+    int margin = 10;
+    glm::vec2 guiPosition{windowWidth - guiWidth - margin, margin};
+
+    // create labels and sliders for options
+    glm::vec2 currPosition = guiPosition;
+
+    renderer->createLabel("Smoothing Radius", currPosition, glm::vec2(guiWidth, 30));
+    currPosition.y += 30;
+
+    renderer->createSlider(currPosition, glm::vec2(guiWidth, 30), 0.0f, 250.0f, options.smoothingRadius,
+                           [&](float value)
+                           {
+                               options.smoothingRadius = value;
+                           });
 }

@@ -11,6 +11,10 @@ Fluid::Fluid::Fluid(FluidOptions &options) : options(options)
 
 Fluid::Fluid::~Fluid()
 {
+    for (auto p : particles)
+    {
+        delete p;
+    }
 }
 
 void Fluid::Fluid::init()
@@ -39,6 +43,7 @@ void Fluid::Fluid::init()
         p->pressure = 0;
         p->pressureForce = glm::vec2(0, 0);
         p->viscosityForce = glm::vec2(0, 0);
+        p->tensionForce = glm::vec2(0, 0);
 
         particles.push_back(p);
     }
@@ -46,25 +51,37 @@ void Fluid::Fluid::init()
 
 void Fluid::Fluid::update(float dt)
 {
-    updateGrid();
 
-    // solve
-
-    // precompute neighbours
+    // pre solve
     for (auto p : particles)
     {
-        p->neighbours = getParticlesOfInfluence(p);
-        // std::cout << p->neighbours.size() << std::endl;
+        // calculate predicted position
+        p->predictedPosition = p->position + p->velocity * (1.0f / 120.0f);
     }
 
+    // update grid
+    updateGrid(false);
+
+    for (auto p : particles)
+    {
+        // update mass and radius
+        p->mass = options.particleMass;
+        p->radius = options.particleRadius;
+
+        // precompute neighbours
+        p->neighbours = getParticlesOfInfluence(p, false);
+    }
+
+    // solve
     solveDensity();
     solvePressure();
     solvePressureForce();
-    solveViscosityForce();
+    // solveViscosityForce();
 
     // apply forces
     applyGravity(dt);
     applySPHForces(dt);
+    applyAttractors(dt);
     applyVelocity(dt);
     applyBoundingBox();
 }
@@ -84,6 +101,31 @@ void Fluid::Fluid::clearParticles()
     particles.clear();
 }
 
+void Fluid::Fluid::addAttractor(FluidAttractor *attractor)
+{
+    removeAttractor(attractor);
+    attractors.push_back(attractor);
+}
+
+bool Fluid::Fluid::removeAttractor(FluidAttractor *attractor)
+{
+    for (int i = 0; i < attractors.size(); i++)
+    {
+        if (attractors[i] == attractor)
+        {
+            attractors.erase(attractors.begin() + i);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void Fluid::Fluid::clearAttractors()
+{
+    attractors.clear();
+}
+
 Fluid::Grid &Fluid::Fluid::getGrid()
 {
     return grid;
@@ -101,18 +143,43 @@ void Fluid::Fluid::applySPHForces(float dt)
 {
     for (auto p : particles)
     {
-        if (p->density == 0 || p->pressure == 0)
+        if (p->density == 0)
         {
             // std::cout << "density is 0" << std::endl;
             continue;
         }
 
-        p->velocity += ((p->pressureForce + p->viscosityForce) / p->density) * dt;
+        p->velocity += ((p->pressureForce + p->viscosityForce + p->tensionForce) / p->density) * dt;
 
         // std::cout << p->pressure << std::endl;
         // std::cout << p->density << std::endl;
         // std::cout << p->pressureForce.x << ", " << p->pressureForce.y << std::endl;
         // std::cout << p->viscosityForce.x << ", " << p->viscosityForce.y << std::endl;
+    }
+}
+
+void Fluid::Fluid::applyAttractors(float dt)
+{
+    for (auto a : attractors)
+    {
+        for (auto p : particles)
+        {
+            glm::vec2 pToA = a->position - p->position;
+            float dist = glm::length(pToA);
+            glm::vec2 dir = pToA / dist;
+
+            auto pd = new ParticleDistance{
+                dist,
+                dir,
+            };
+
+            if (dist < a->radius)
+            {
+                p->velocity += -a->strength * smoothingKernelPoly6.calculateGradient(pd, a->radius) * dt;
+            }
+
+            delete pd;
+        }
     }
 }
 
@@ -128,27 +195,27 @@ void Fluid::Fluid::applyBoundingBox()
 {
     for (auto p : particles)
     {
-        if (p->position.x - p->radius < options.boundingBox.min.x)
+        if (p->position.x < options.boundingBox.min.x)
         {
-            p->position.x = options.boundingBox.min.x + p->radius;
+            p->position.x = options.boundingBox.min.x;
             p->velocity.x *= -options.boudingBoxRestitution;
         }
 
-        if (p->position.x + p->radius > options.boundingBox.max.x)
+        if (p->position.x > options.boundingBox.max.x)
         {
-            p->position.x = options.boundingBox.max.x - p->radius;
+            p->position.x = options.boundingBox.max.x;
             p->velocity.x *= -options.boudingBoxRestitution;
         }
 
-        if (p->position.y - p->radius < options.boundingBox.min.y)
+        if (p->position.y < options.boundingBox.min.y)
         {
-            p->position.y = options.boundingBox.min.y + p->radius;
+            p->position.y = options.boundingBox.min.y;
             p->velocity.y *= -options.boudingBoxRestitution;
         }
 
-        if (p->position.y + p->radius > options.boundingBox.max.y)
+        if (p->position.y > options.boundingBox.max.y)
         {
-            p->position.y = options.boundingBox.max.y - p->radius;
+            p->position.y = options.boundingBox.max.y;
             p->velocity.y *= -options.boudingBoxRestitution;
         }
     }
@@ -165,6 +232,8 @@ void Fluid::Fluid::solveDensity()
             p->density += q.particle->mass * smoothingKernelPoly6.calculate(&q.distance, options.smoothingRadius);
             // std::cout << q.distance.distance << std::endl;
         }
+
+        // std::cout << p->density << std::endl;
     }
 }
 
@@ -173,6 +242,7 @@ void Fluid::Fluid::solvePressure()
     for (auto p : particles)
     {
         p->pressure = options.stiffness * (p->density - options.desiredRestDensity);
+        // std::cout << p->pressure << std::endl;
     }
 }
 
@@ -184,13 +254,15 @@ void Fluid::Fluid::solvePressureForce()
 
         for (auto q : p->neighbours)
         {
-            if (q.particle->density == 0)
-                continue;
+            float sharedPressure = (p->pressure + q.particle->pressure) / (2 * q.particle->density);
+            glm::vec2 smoothing = smoothingKernelSpiky.calculateGradient(&q.distance, options.smoothingRadius);
 
-            p->pressureForce += q.particle->mass * ((p->pressure + q.particle->pressure) / (2 * q.particle->density)) * smoothingKernelSpiky.calculateGradient(&q.distance, options.smoothingRadius);
+            p->pressureForce += sharedPressure * smoothing * q.particle->mass;
         }
 
         p->pressureForce *= -1;
+
+        // std::cout << p->pressureForce.x << ", " << p->pressureForce.y << std::endl;
     }
 }
 
@@ -202,9 +274,6 @@ void Fluid::Fluid::solveViscosityForce()
 
         for (auto q : p->neighbours)
         {
-            if (q.particle->density == 0)
-                continue;
-
             p->viscosityForce += q.particle->mass * ((q.particle->velocity - p->velocity) / q.particle->density) * smoothingKernelViscosity.calculateLaplacian(&q.distance, options.smoothingRadius);
         }
 
@@ -212,12 +281,58 @@ void Fluid::Fluid::solveViscosityForce()
     }
 }
 
-std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Particle *p)
+void Fluid::Fluid::solveTensionForce()
+{
+    for (auto p : particles)
+    {
+        p->tensionForce = glm::vec2(0, 0);
+
+        for (auto q : p->neighbours)
+        {
+            float colorFieldNoSmoothingKernel = q.particle->mass * (1 / q.particle->density);
+
+            glm::vec2 n = colorFieldNoSmoothingKernel * smoothingKernelPoly6.calculateGradient(&q.distance, options.smoothingRadius);
+            float modN = glm::length(n);
+
+            if (modN < options.surfaceTensionThreshold)
+                continue;
+
+            glm::vec2 normalizedN = n / modN;
+            float colorFieldLaplacian = colorFieldNoSmoothingKernel * smoothingKernelPoly6.calculateLaplacian(&q.distance, options.smoothingRadius);
+
+            p->tensionForce += -options.surfaceTension * colorFieldLaplacian * normalizedN;
+        }
+    }
+}
+
+std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Particle *p, bool usePredictedPosition)
 {
     float smoothingRadiusSqr = options.smoothingRadius * options.smoothingRadius;
     auto &key = p->gridKey;
 
     std::vector<ParticleNeighbour> close;
+
+    for (auto q : particles)
+    {
+
+        auto pPosition = usePredictedPosition ? p->predictedPosition : p->position;
+        auto qPosition = usePredictedPosition ? q->predictedPosition : q->position;
+
+        auto temp = pPosition - qPosition;
+        auto len = glm::length(temp);
+
+        if (p == q || len >= options.smoothingRadius)
+            continue;
+
+        close.push_back(ParticleNeighbour{
+            q,
+            ParticleDistance{
+                len == 0 ? 1.0f : len,
+                len == 0 ? randomDirection() : temp / len,
+            },
+        });
+    }
+    return close;
 
     // add all particles in the same cell
     // no need to check if they're in range
@@ -228,11 +343,17 @@ std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Part
         if (p == q)
             continue;
 
+        auto pPosition = usePredictedPosition ? p->predictedPosition : p->position;
+        auto qPosition = usePredictedPosition ? q->predictedPosition : q->position;
+
+        auto temp = pPosition - qPosition;
+        auto len = glm::length(temp);
+
         close.push_back(ParticleNeighbour{
             q,
             ParticleDistance{
-                glm::distance(p->position, q->position),
-                glm::normalize(p->position - q->position),
+                len == 0 ? 1.0f : len,
+                len == 0 ? randomDirection() : temp / len,
             },
         });
     }
@@ -251,14 +372,23 @@ std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Part
 
             for (Particle *q : grid[gridKey])
             {
-                auto temp = p->position - q->position;
+                auto pPosition = usePredictedPosition ? p->predictedPosition : p->position;
+                auto qPosition = usePredictedPosition ? q->predictedPosition : q->position;
+                auto temp = pPosition - qPosition;
+
                 if (glm::dot(temp, temp) < smoothingRadiusSqr)
                 {
+                    auto len = glm::length(temp);
+
+                    // std::cout << temp.x << ", " << temp.y << std::endl;
+                    // std::cout << glm::dot(temp, temp) << std::endl;
+                    // std::cout << glm::length(temp) << std::endl;
+
                     close.push_back(ParticleNeighbour{
                         q,
                         ParticleDistance{
-                            glm::distance(p->position, q->position),
-                            glm::normalize(temp),
+                            len == 0 ? 1.0f : len,
+                            len == 0 ? randomDirection() : temp / len,
                         },
                     });
                 }
@@ -269,19 +399,19 @@ std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Part
     return close;
 }
 
-void Fluid::Fluid::updateGrid()
+void Fluid::Fluid::updateGrid(bool usePredictedPositions)
 {
     grid.clear();
 
     for (Particle *p : particles)
     {
-        insertIntoGrid(p);
+        insertIntoGrid(p, usePredictedPositions);
     }
 }
 
-void Fluid::Fluid::insertIntoGrid(Particle *p)
+void Fluid::Fluid::insertIntoGrid(Particle *p, bool usePredictedPosition)
 {
-    p->gridKey = getGridKey(p);
+    p->gridKey = getGridKey(p, usePredictedPosition);
 
     if (grid.count(p->gridKey) == 0)
         grid[p->gridKey] = std::vector<Particle *>();
@@ -289,13 +419,20 @@ void Fluid::Fluid::insertIntoGrid(Particle *p)
     grid[p->gridKey].push_back(p);
 }
 
-std::pair<int, int> Fluid::Fluid::getGridKey(Particle *p)
+std::pair<int, int> Fluid::Fluid::getGridKey(Particle *p, bool usePredictedPosition)
 {
     int cellWidth = options.smoothingRadius;
     int cellHeight = options.smoothingRadius;
 
-    int x = (p->position.x - options.boundingBox.min.x) / cellWidth;
-    int y = (p->position.y - options.boundingBox.min.y) / cellHeight;
+    auto position = usePredictedPosition ? p->predictedPosition : p->position;
+    int x = (position.x - options.boundingBox.min.x) / cellWidth;
+    int y = (position.y - options.boundingBox.min.y) / cellHeight;
 
     return std::make_pair(x, y);
+}
+
+glm::vec2 Fluid::Fluid::randomDirection()
+{
+    float angle = static_cast<float>(rand()) / RAND_MAX * 2 * std::numbers::pi;
+    return glm::vec2(std::cos(angle), std::sin(angle));
 }

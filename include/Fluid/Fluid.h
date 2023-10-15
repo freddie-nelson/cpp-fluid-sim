@@ -29,6 +29,15 @@ namespace Fluid
         float desiredRestDensity;
         float particleMass;
         float viscosity;
+        float surfaceTension;
+        float surfaceTensionThreshold;
+    };
+
+    struct FluidAttractor
+    {
+        glm::vec2 position;
+        float radius;
+        float strength;
     };
 
     using Grid = std::unordered_map<std::pair<int, int>, std::vector<Particle *>, boost::hash<std::pair<int, int>>>;
@@ -45,11 +54,16 @@ namespace Fluid
         std::vector<Particle *> &getParticles();
         void clearParticles();
 
+        void addAttractor(FluidAttractor *attractor);
+        bool removeAttractor(FluidAttractor *attractor);
+        void clearAttractors();
+
         Grid &getGrid();
 
     private:
         void applyGravity(float dt);
         void applySPHForces(float dt);
+        void applyAttractors(float dt);
         void applyVelocity(float dt);
 
         void applyBoundingBox();
@@ -58,15 +72,19 @@ namespace Fluid
         void solvePressure();
         void solvePressureForce();
         void solveViscosityForce();
+        void solveTensionForce();
 
-        std::vector<ParticleNeighbour> getParticlesOfInfluence(Particle *p);
+        std::vector<ParticleNeighbour> getParticlesOfInfluence(Particle *p, bool usePredictedPositions = false);
 
-        void updateGrid();
-        void insertIntoGrid(Particle *p);
-        std::pair<int, int> getGridKey(Particle *p);
+        void updateGrid(bool usePredictedPositions = false);
+        void insertIntoGrid(Particle *p, bool usePredictedPositions = false);
+        std::pair<int, int> getGridKey(Particle *p, bool usePredictedPositions = false);
+
+        glm::vec2 randomDirection();
 
         FluidOptions options;
         std::vector<Particle *> particles;
+        std::vector<FluidAttractor *> attractors;
 
         Grid grid;
 

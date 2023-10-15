@@ -31,6 +31,8 @@ namespace Fluid
         float pressure;
         glm::vec2 pressureForce;
         glm::vec2 viscosityForce;
+        glm::vec2 tensionForce;
+        glm::vec2 predictedPosition;
 
         // cached neighbours
         std::vector<ParticleNeighbour> neighbours;

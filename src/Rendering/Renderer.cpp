@@ -16,7 +16,6 @@ Rendering::Renderer::~Renderer()
 int Rendering::Renderer::init()
 {
     window = new sf::RenderWindow(sf::VideoMode(windowWidth, windowHeight), windowTitle);
-
     return 0;
 }
 
@@ -172,3 +171,15 @@ void Rendering::Renderer::polygon(const std::vector<glm::vec2> &vertices, const 
 
     window->draw(shape);
 };
+
+void Rendering::Renderer::createButton(std::string text, glm::vec2 position, glm::vec2 size, std::function<void()> onClickCallback)
+{
+}
+
+void Rendering::Renderer::createLabel(std::string text, glm::vec2 position, glm::vec2 size)
+{
+}
+
+void Rendering::Renderer::createSlider(glm::vec2 position, glm::vec2 size, float min, float max, float value, std::function<void(float)> onChangeCallback)
+{
+}
