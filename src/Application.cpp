@@ -4,6 +4,7 @@
 #include "../include/Utility/Timestep.h"
 #include "../include/Utility/InputCodes.h"
 
+#include <glm/glm.hpp>
 #include <math.h>
 #include <random>
 #include <time.h>
@@ -169,7 +170,7 @@ void Application::render(bool clear)
     {
         auto p = particles[i];
         circles[i] = Rendering::Circle{p->position, options.particleRadius};
-        colors[i] = Rendering::Color{0, 0, 255, 255};
+        colors[i] = getParticleColor(p);
     }
 
     renderer->shaderCircles(circles, colors, numParticles);
@@ -223,6 +224,34 @@ void Application::render(bool clear)
 
     // render
     renderer->present();
+}
+
+Rendering::Color Application::getParticleColor(Fluid::Particle *particle)
+{
+    const float v = glm::dot(particle->velocity, particle->velocity);
+
+    const float steps[] = {std::pow(60.0f, 2), std::pow(200.0f, 2), std::pow(400.0f, 2), std::pow(700.0f, 2)};
+    const Rendering::Color colors[] = {{33, 55, 222, 255},
+                                       {8, 177, 255, 255},
+                                       {78, 255, 8, 255},
+                                       {255, 53, 8, 255}};
+
+    for (int i = 1; i < 4; i++)
+    {
+        if (v < steps[i])
+        {
+            float ratio = (v - steps[i - 1]) / (steps[i] - steps[i - 1]);
+            Rendering::Color bg = colors[i - 1];
+            bg.a = 255;
+
+            Rendering::Color fg = colors[i];
+            fg.a = 255 * ratio;
+
+            return Rendering::blend(bg, fg);
+        }
+    }
+
+    return colors[3];
 }
 
 void Application::renderPerPixelDensity(unsigned int skip)
