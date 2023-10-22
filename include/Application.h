@@ -37,6 +37,8 @@ private:
     void update(float dt);
     void render(bool clear = true);
 
+    Rendering::Color getParticleColor(Fluid::Particle *particle);
+
     bool enablePerPixelDensity = false;
     void renderPerPixelDensity(unsigned int skip);
 

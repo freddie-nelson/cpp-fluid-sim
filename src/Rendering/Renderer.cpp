@@ -17,6 +17,15 @@ Rendering::Renderer::~Renderer()
 int Rendering::Renderer::init()
 {
     window = new sf::RenderWindow(sf::VideoMode(windowWidth, windowHeight), windowTitle);
+
+    // init circle shader
+    circlesShader = new sf::Shader();
+    if (!circlesShader->loadFromFile("./Shaders/circles.vert", "./Shaders/circles.frag"))
+    {
+        std::cout << "Failed to load circle shader." << std::endl;
+        return 1;
+    }
+
     return 0;
 }
 
@@ -197,6 +206,39 @@ void Rendering::Renderer::polygon(const std::vector<glm::vec2> &vertices, const 
     }
 
     window->draw(shape);
+};
+
+void Rendering::Renderer::shaderCircles(Circle circles[], Color color[], int numCircles)
+{
+    int maxCircles = 500;
+    int rendered = 0;
+
+    while (rendered < numCircles)
+    {
+        int toRender = std::min(maxCircles, numCircles - rendered);
+
+        sf::Glsl::Vec2 positions[toRender];
+        sf::Glsl::Vec4 colors[toRender];
+
+        for (int i = 0; i < toRender; i++)
+        {
+            int ci = rendered + i;
+
+            positions[i] = sf::Glsl::Vec2(circles[ci].centre.x, circles[ci].centre.y);
+            colors[i] = sf::Glsl::Vec4(color[ci].r / 255.0f, color[ci].g / 255.0f, color[ci].b / 255.0f, color[ci].a / 255.0f);
+        }
+
+        circlesShader->setUniform("u_Radius", circles[0].radius);
+        circlesShader->setUniformArray("u_Circles", positions, toRender);
+        circlesShader->setUniformArray("u_Colors", colors, toRender);
+        circlesShader->setUniform("u_NumCircles", toRender);
+        circlesShader->setUniform("u_Resolution", sf::Glsl::Vec2(windowWidth, windowHeight));
+
+        sf::RectangleShape shape(sf::Vector2f(0, 0));
+        window->draw(shape, circlesShader);
+
+        rendered += toRender;
+    }
 };
 
 void Rendering::Renderer::createButton(std::string text, glm::vec2 position, glm::vec2 size, std::function<void()> onClickCallback)

@@ -83,6 +83,8 @@ namespace Rendering
          */
         void polygon(const std::vector<glm::vec2> &vertices, const Color &color, RenderType renderType = RenderType::FILL);
 
+        void shaderCircles(Circle circles[], Color colors[], int numCircles);
+
         // gui methods
 
         void createLabel(std::string text, glm::vec2 position, glm::vec2 size);
@@ -96,6 +98,8 @@ namespace Rendering
 
         sf::Image *pixelImage;
         sf::RenderWindow *window;
+
+        sf::Shader *circlesShader;
     };
 
 }

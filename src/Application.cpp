@@ -109,7 +109,7 @@ int Application::init()
         boudingBoxRestitution : 0.05f,
 
         smoothingRadius : 50.0f,
-        stiffness : 1.25e6f,
+        stiffness : 1.0e6f,
         desiredRestDensity : 0.000025f,
         particleMass : 0.045f,
         viscosity : 0.13f,
@@ -159,11 +159,20 @@ void Application::render(bool clear)
     }
 
     // draw particles
-    for (auto p : fluid->getParticles())
+    auto particles = fluid->getParticles();
+    int numParticles = particles.size();
+
+    Rendering::Circle circles[numParticles];
+    Rendering::Color colors[numParticles];
+
+    for (int i = 0; i < numParticles; i++)
     {
-        auto color = Rendering::Color{255, 255, 255, 255};
-        renderer->circle(Rendering::Circle{p->position, options.particleRadius}, color, Rendering::RenderType::FILL);
+        auto p = particles[i];
+        circles[i] = Rendering::Circle{p->position, options.particleRadius};
+        colors[i] = Rendering::Color{0, 0, 255, 255};
     }
+
+    renderer->shaderCircles(circles, colors, numParticles);
 
     // draw attractor
     if (isAttractorActive)
@@ -360,7 +369,7 @@ void Application::addSimulationControls()
 void Application::createFluidInteractionListener()
 {
     float radius = 200.0f;
-    float strength = options.stiffness * (options.stiffness * 0.018f);
+    float strength = options.stiffness * (options.stiffness * 0.025f);
 
     attractor = new Fluid::FluidAttractor{
         position : glm::vec2(0, 0),
