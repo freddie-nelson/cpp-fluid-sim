@@ -95,7 +95,7 @@ int Application::init()
 
     // init fluid
     options = Fluid::FluidOptions{
-        numParticles : 950,
+        numParticles : 900,
         particleRadius : 5,
         particleSpacing : 5,
         initialCentre : glm::vec2(windowWidth / 2, windowHeight / 2),
@@ -112,7 +112,7 @@ int Application::init()
         stiffness : 1.25e6f,
         desiredRestDensity : 0.000025f,
         particleMass : 0.045f,
-        viscosity : 0.0f,
+        viscosity : 0.13f,
         surfaceTension : 0.0f,
         surfaceTensionThreshold : 0.0f,
 
@@ -166,10 +166,10 @@ void Application::render(bool clear)
     }
 
     // draw attractor
-    if (leftMouseDown)
+    if (isAttractorActive)
     {
         renderer->circle(Rendering::Circle{attractor->position, attractor->radius},
-                         Rendering::Color{255, 255, 255, 255}, Rendering::RenderType::STROKE);
+                         Rendering::Color{0, 255, 0, 255}, Rendering::RenderType::STROKE);
     }
 
     if (Globals::DEBUG_MODE)
@@ -319,6 +319,11 @@ void Application::addSimulationControls()
                          std::cout << "[OPTION SELECTED]: particle mass" << std::endl;
                          selectedOption = "particle mass";
                      }
+                     else if (keyCode == Utility::KeyCode::KEY_V)
+                     {
+                         std::cout << "[OPTION SELECTED]: viscosity" << std::endl;
+                         selectedOption = "viscosity";
+                     }
                      else if (keyCode == Utility::KeyCode::KEY_UP || keyCode == Utility::KeyCode::KEY_DOWN)
                      {
                          int sign = keyCode == Utility::KeyCode::KEY_UP ? 1 : -1;
@@ -343,28 +348,41 @@ void Application::addSimulationControls()
                              options.particleMass *= sign == 1 ? 1.025 : 0.975;
                              std::cout << "[PARTICLE MASS]: " << options.particleMass << std::endl;
                          }
+                         else if (selectedOption == "viscosity")
+                         {
+                             options.viscosity += 0.01f * sign;
+                             std::cout << "[VISCOSITY]: " << options.viscosity << std::endl;
+                         }
                      }
                  });
 }
 
 void Application::createFluidInteractionListener()
 {
-    float radius = 150.0f;
+    float radius = 200.0f;
+    float strength = options.stiffness * (options.stiffness * 0.018f);
 
     attractor = new Fluid::FluidAttractor{
         position : glm::vec2(0, 0),
         radius : radius,
-        strength : options.stiffness * (options.stiffness * 0.01f),
+        strength : strength,
     };
 
     renderer->on(Rendering::RendererEventType::MOUSE_DOWN,
-                 [&](Rendering::RendererEvent event)
+                 [&, strength](Rendering::RendererEvent event)
                  {
                      auto mouseButton = *static_cast<Utility::MouseButton *>(event.data);
 
-                     if (mouseButton == Utility::MouseButton::MOUSE_LEFT)
+                     if (mouseButton == Utility::MouseButton::MOUSE_LEFT && !isAttractorActive)
                      {
-                         leftMouseDown = true;
+                         isAttractorActive = true;
+                         attractor->strength = strength;
+                         fluid->addAttractor(attractor);
+                     }
+                     else if (mouseButton == Utility::MouseButton::MOUSE_RIGHT && !isAttractorActive)
+                     {
+                         isAttractorActive = true;
+                         attractor->strength = -strength;
                          fluid->addAttractor(attractor);
                      }
                  });
@@ -374,9 +392,9 @@ void Application::createFluidInteractionListener()
                  {
                      auto mouseButton = *static_cast<Utility::MouseButton *>(event.data);
 
-                     if (mouseButton == Utility::MouseButton::MOUSE_LEFT)
+                     if (mouseButton == Utility::MouseButton::MOUSE_LEFT || mouseButton == Utility::MouseButton::MOUSE_RIGHT)
                      {
-                         leftMouseDown = false;
+                         isAttractorActive = false;
                          fluid->removeAttractor(attractor);
                      }
                  });

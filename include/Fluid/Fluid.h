@@ -65,18 +65,17 @@ namespace Fluid
         float solveDensityAtPoint(const glm::vec2 &point);
 
     private:
-        void solveDensity();
-        void solvePressure();
-        void solvePressureForce();
-        void solveViscosityForce();
-        void solveTensionForce();
+        void solveDensityPressure(Particle *p);
+        void solvePressureForce(Particle *p);
+        void solveViscosityForce(Particle *p);
+        void solveTensionForce(Particle *p);
 
-        void applyGravity(float dt);
-        void applySPHForces(float dt);
-        void applyAttractors(float dt);
-        void applyVelocity(float dt);
+        void applyGravity(Particle *p, float dt);
+        void applySPHForces(Particle *p, float dt);
+        void applyAttractors(Particle *p, float dt);
+        void applyVelocity(Particle *p, float dt);
 
-        void applyBoundingBox();
+        void applyBoundingBox(Particle *p);
 
         std::vector<ParticleNeighbour> getParticlesOfInfluence(Particle *p, bool usePredictedPositions = false);
 

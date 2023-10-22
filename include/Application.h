@@ -46,7 +46,7 @@ private:
     void addSimulationControls();
 
     glm::vec2 mousePos;
-    bool leftMouseDown = false;
+    bool isAttractorActive = false;
     Fluid::FluidAttractor *attractor = nullptr;
 
     void createFluidInteractionListener();
