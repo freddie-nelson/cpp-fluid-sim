@@ -2,6 +2,6 @@
 
 int main(int argv, char **args)
 {
-    Application app("Fluid Sim", 1000, 600);
+    Application app("Fluid Sim", 1400, 800);
     return app.run();
 }

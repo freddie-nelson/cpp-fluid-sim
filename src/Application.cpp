@@ -95,23 +95,23 @@ int Application::init()
 
     // init fluid
     options = Fluid::FluidOptions{
-        numParticles : 400,
+        numParticles : 950,
         particleRadius : 5,
         particleSpacing : 5,
         initialCentre : glm::vec2(windowWidth / 2, windowHeight / 2),
 
-        gravity : glm::vec2(0, 1200.0f),
+        gravity : glm::vec2(0, 1500.0f),
 
         boundingBox : Fluid::AABB{
             min : glm::vec2(0, 0),
             max : glm::vec2(windowWidth, windowHeight)
         },
-        boudingBoxRestitution : 0.3f,
+        boudingBoxRestitution : 0.05f,
 
-        smoothingRadius : 120.0f,
-        stiffness : 5000000.0f,
-        desiredRestDensity : 0.000015f,
-        particleMass : 0.02f,
+        smoothingRadius : 50.0f,
+        stiffness : 1.25e6f,
+        desiredRestDensity : 0.000025f,
+        particleMass : 0.045f,
         viscosity : 0.0f,
         surfaceTension : 0.0f,
         surfaceTensionThreshold : 0.0f,
@@ -314,6 +314,11 @@ void Application::addSimulationControls()
                          std::cout << "[OPTION SELECTED]: gravity" << std::endl;
                          selectedOption = "gravity";
                      }
+                     else if (keyCode == Utility::KeyCode::KEY_M)
+                     {
+                         std::cout << "[OPTION SELECTED]: particle mass" << std::endl;
+                         selectedOption = "particle mass";
+                     }
                      else if (keyCode == Utility::KeyCode::KEY_UP || keyCode == Utility::KeyCode::KEY_DOWN)
                      {
                          int sign = keyCode == Utility::KeyCode::KEY_UP ? 1 : -1;
@@ -333,6 +338,11 @@ void Application::addSimulationControls()
                              options.gravity.y += 10.0f * sign;
                              std::cout << "[GRAVITY]: " << options.gravity.y << std::endl;
                          }
+                         else if (selectedOption == "particle mass")
+                         {
+                             options.particleMass *= sign == 1 ? 1.025 : 0.975;
+                             std::cout << "[PARTICLE MASS]: " << options.particleMass << std::endl;
+                         }
                      }
                  });
 }
@@ -344,7 +354,7 @@ void Application::createFluidInteractionListener()
     attractor = new Fluid::FluidAttractor{
         position : glm::vec2(0, 0),
         radius : radius,
-        strength : options.stiffness * (radius * (radius * 0.25f)),
+        strength : options.stiffness * (options.stiffness * 0.01f),
     };
 
     renderer->on(Rendering::RendererEventType::MOUSE_DOWN,

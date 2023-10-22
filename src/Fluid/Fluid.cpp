@@ -53,6 +53,8 @@ void Fluid::Fluid::update(float dt)
 {
 
     // pre solve
+    applyGravity(dt);
+
     if (options.usePredictedPositions)
     {
         for (auto p : particles)
@@ -82,7 +84,6 @@ void Fluid::Fluid::update(float dt)
     // solveViscosityForce();
 
     // apply forces
-    applyGravity(dt);
     applySPHForces(dt);
     applyAttractors(dt);
     applyVelocity(dt);
@@ -476,7 +477,7 @@ std::pair<int, int> Fluid::Fluid::getGridKey(Particle *p, bool usePredictedPosit
 
 glm::vec2 Fluid::Fluid::randomDirection()
 {
-    std::cout << "random direction" << std::endl;
+    // std::cout << "random direction" << std::endl;
 
     float angle = static_cast<float>(rand()) / RAND_MAX * 2 * std::numbers::pi;
     return glm::normalize(glm::vec2(std::cos(angle), std::sin(angle)));
