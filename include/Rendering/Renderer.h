@@ -67,6 +67,9 @@ namespace Rendering
 
         void clear();
         void present();
+        void presentDrawnPixels();
+
+        void pixel(glm::vec2 position, const Color &color);
 
         void line(glm::vec2 start, glm::vec2 end, const Color &color);
         void circle(const Circle &circle, const Color &color, RenderType renderType = RenderType::FILL);
@@ -91,6 +94,7 @@ namespace Rendering
         int windowWidth;
         int windowHeight;
 
+        sf::Image *pixelImage;
         sf::RenderWindow *window;
     };
 

@@ -8,8 +8,8 @@ float Fluid::SmoothingKernelPoly6::calculate(ParticleDistance *distance, float s
     float r = distance->distance;
     float h = smoothingRadius;
 
-    // if (r <= 0.0f || r >= h)
-    //     return 0.0f;
+    if (r <= 0.0f || r >= h)
+        return 0.0f;
 
     float volume = (std::numbers::pi * std::pow(h, 8)) / 4.0f;
     float value = std::fmax(0.0f, std::pow(h, 2) - std::pow(r, 2));

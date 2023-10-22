@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <math.h>
+#include <stdexcept>
 
 Rendering::Renderer::Renderer(std::string windowTitle, int windowWidth, int windowHeight) : windowTitle(windowTitle), windowWidth(windowWidth), windowHeight(windowHeight)
 {
@@ -88,11 +89,37 @@ bool Rendering::Renderer::pollEvents()
 void Rendering::Renderer::clear()
 {
     window->clear();
+
+    // setup pixelImage
+    delete pixelImage;
+    pixelImage = new sf::Image();
+    pixelImage->create(windowWidth, windowHeight, sf::Color::Transparent);
 }
 
 void Rendering::Renderer::present()
 {
     window->display();
+}
+
+void Rendering::Renderer::presentDrawnPixels()
+{
+    sf::Texture texture;
+    texture.loadFromImage(*pixelImage);
+
+    sf::Sprite pixelSprite;
+    pixelSprite.setTexture(texture, true);
+
+    window->draw(pixelSprite);
+}
+
+void Rendering::Renderer::pixel(glm::vec2 position, const Color &color)
+{
+    if (position.x < 0 || position.x >= windowWidth || position.y < 0 || position.y >= windowHeight)
+    {
+        throw std::invalid_argument("Pixel position out of bounds of window.");
+    }
+
+    pixelImage->setPixel(position.x, position.y, sf::Color(color.r, color.g, color.b, color.a));
 }
 
 void Rendering::Renderer::line(glm::vec2 start, glm::vec2 end, const Color &color)

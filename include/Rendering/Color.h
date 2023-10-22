@@ -10,4 +10,6 @@ namespace Rendering
         int b;
         int a;
     };
+
+    Color blend(const Color &bg, const Color &fg);
 }

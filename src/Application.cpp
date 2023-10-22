@@ -95,12 +95,12 @@ int Application::init()
 
     // init fluid
     options = Fluid::FluidOptions{
-        numParticles : 300,
+        numParticles : 400,
         particleRadius : 5,
         particleSpacing : 5,
         initialCentre : glm::vec2(windowWidth / 2, windowHeight / 2),
 
-        gravity : glm::vec2(0, 0.0f),
+        gravity : glm::vec2(0, 1200.0f),
 
         boundingBox : Fluid::AABB{
             min : glm::vec2(0, 0),
@@ -108,13 +108,15 @@ int Application::init()
         },
         boudingBoxRestitution : 0.3f,
 
-        smoothingRadius : 60.0f,
-        stiffness : 10000.0f,
-        desiredRestDensity : 0.0001f,
-        particleMass : 1.0f,
+        smoothingRadius : 120.0f,
+        stiffness : 5000000.0f,
+        desiredRestDensity : 0.000015f,
+        particleMass : 0.02f,
         viscosity : 0.0f,
         surfaceTension : 0.0f,
-        surfaceTensionThreshold : 0.0f
+        surfaceTensionThreshold : 0.0f,
+
+        usePredictedPositions : true,
     };
 
     fluid = new Fluid::Fluid(options);
@@ -151,32 +153,24 @@ void Application::render(bool clear)
     if (clear)
         renderer->clear();
 
+    if (enablePerPixelDensity)
+    {
+        renderPerPixelDensity(10);
+    }
+
     // draw particles
     for (auto p : fluid->getParticles())
     {
         auto color = Rendering::Color{255, 255, 255, 255};
-        float densityError = std::abs(p->density - options.desiredRestDensity);
-        float densityErrorRatio = densityError / options.desiredRestDensity;
-        float value = 255.0f * densityErrorRatio;
-        int valueInt = static_cast<int>(value);
-        int flippedValueInt = 255 - valueInt;
-
-        if (p->density > options.desiredRestDensity)
-        {
-            color = Rendering::Color{255, 0, 0, valueInt};
-        }
-        else if (p->density < options.desiredRestDensity)
-        {
-            color = Rendering::Color{0, 0, 255, valueInt};
-        }
-
-        renderer->circle(Rendering::Circle{p->position, p->radius}, Rendering::Color{255, 255, 255, 255});
-        renderer->circle(Rendering::Circle{p->position, p->radius}, color);
+        renderer->circle(Rendering::Circle{p->position, options.particleRadius}, color, Rendering::RenderType::FILL);
     }
 
     // draw attractor
-    renderer->circle(Rendering::Circle{attractor->position, attractor->radius},
-                     Rendering::Color{255, 255, 255, 255}, Rendering::RenderType::STROKE);
+    if (leftMouseDown)
+    {
+        renderer->circle(Rendering::Circle{attractor->position, attractor->radius},
+                         Rendering::Color{255, 255, 255, 255}, Rendering::RenderType::STROKE);
+    }
 
     if (Globals::DEBUG_MODE)
     {
@@ -222,6 +216,48 @@ void Application::render(bool clear)
     renderer->present();
 }
 
+void Application::renderPerPixelDensity(unsigned int skip)
+{
+    if (skip == 0)
+        return;
+
+    const Rendering::Color bg{255, 255, 255, 255};
+
+    float maxDensity = options.desiredRestDensity * 2.0f;
+    float minDensity = options.desiredRestDensity / 2.0f;
+
+    for (int i = 0; i < windowWidth; i += skip)
+    {
+        for (int j = 0; j < windowHeight; j += skip)
+        {
+            glm::vec2 position(i, j);
+            auto key = std::make_pair(i, j);
+
+            float density = fluid->solveDensityAtPoint(position + glm::vec2(skip / 2.0f, skip / 2.0f));
+            if (density == 0.0f)
+                continue;
+
+            float densityRatio = density / (density >= options.desiredRestDensity ? maxDensity : minDensity);
+            float value = 255.0f * densityRatio;
+            int valueInt = std::min(static_cast<int>(value), 255);
+
+            Rendering::Color fg = density >= options.desiredRestDensity ? Rendering::Color{255, 0, 0, valueInt} : Rendering::Color{0, 0, 255, valueInt};
+            auto c = Rendering::blend(bg, fg);
+            // std::cout << c.r << ", " << c.g << ", " << c.b << ", " << c.a << std::endl;
+
+            for (int px = 0; px < skip; px++)
+            {
+                for (int py = 0; py < skip; py++)
+                {
+                    renderer->pixel(position + glm::vec2(px, py), c);
+                }
+            }
+        }
+    }
+
+    renderer->presentDrawnPixels();
+}
+
 void Application::addSimulationControls()
 {
     renderer->on(Rendering::RendererEventType::KEY_UP,
@@ -255,6 +291,14 @@ void Application::addSimulationControls()
                      {
                          Globals::DEBUG_MODE = !Globals::DEBUG_MODE;
                      }
+                     else if (keyCode == Utility::KeyCode::KEY_C)
+                     {
+                         enablePerPixelDensity = !enablePerPixelDensity;
+                     }
+                     else if (keyCode == Utility::KeyCode::KEY_Y)
+                     {
+                         options.usePredictedPositions = !options.usePredictedPositions;
+                     }
                      else if (keyCode == Utility::KeyCode::KEY_S)
                      {
                          std::cout << "[OPTION SELECTED]: stiffness" << std::endl;
@@ -265,19 +309,29 @@ void Application::addSimulationControls()
                          std::cout << "[OPTION SELECTED]: particles" << std::endl;
                          selectedOption = "particles";
                      }
+                     else if (keyCode == Utility::KeyCode::KEY_G)
+                     {
+                         std::cout << "[OPTION SELECTED]: gravity" << std::endl;
+                         selectedOption = "gravity";
+                     }
                      else if (keyCode == Utility::KeyCode::KEY_UP || keyCode == Utility::KeyCode::KEY_DOWN)
                      {
                          int sign = keyCode == Utility::KeyCode::KEY_UP ? 1 : -1;
 
                          if (selectedOption == "stiffness")
                          {
-                             options.stiffness += 1000.0f * sign;
+                             options.stiffness *= sign == 1 ? 1.1 : 0.9;
                              std::cout << "[STIFFNESS]: " << options.stiffness << std::endl;
                          }
                          else if (selectedOption == "particles")
                          {
                              options.numParticles += 10 * sign;
                              std::cout << "[PARTICLES]: " << options.numParticles << std::endl;
+                         }
+                         else if (selectedOption == "gravity")
+                         {
+                             options.gravity.y += 10.0f * sign;
+                             std::cout << "[GRAVITY]: " << options.gravity.y << std::endl;
                          }
                      }
                  });
@@ -290,7 +344,7 @@ void Application::createFluidInteractionListener()
     attractor = new Fluid::FluidAttractor{
         position : glm::vec2(0, 0),
         radius : radius,
-        strength : options.stiffness * (radius / 5.0f),
+        strength : options.stiffness * (radius * (radius * 0.25f)),
     };
 
     renderer->on(Rendering::RendererEventType::MOUSE_DOWN,

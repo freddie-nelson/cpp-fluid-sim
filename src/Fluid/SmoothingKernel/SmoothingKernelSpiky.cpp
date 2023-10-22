@@ -8,8 +8,8 @@ float Fluid::SmoothingKernelSpiky::calculate(ParticleDistance *distance, float s
     float r = distance->distance;
     float h = smoothingRadius;
 
-    // if (r <= 0.0f || r >= h)
-    //     return 0.0f;
+    if (r <= 0.0f || r >= h)
+        return 0.0f;
 
     float volume = (std::numbers::pi * std::pow(h, 4)) / 6;
     return std::pow(h - r, 2) / volume;
@@ -20,7 +20,7 @@ glm::vec2 Fluid::SmoothingKernelSpiky::calculateGradient(ParticleDistance *dista
     float r = distance->distance;
     float h = smoothingRadius;
 
-    if (r >= h)
+    if (r <= 0.0f || r >= h)
         return glm::vec2(0, 0);
 
     float scale = 12 / (std::pow(h, 4) * std::numbers::pi);

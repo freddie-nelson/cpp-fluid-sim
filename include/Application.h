@@ -37,6 +37,9 @@ private:
     void update(float dt);
     void render(bool clear = true);
 
+    bool enablePerPixelDensity = false;
+    void renderPerPixelDensity(unsigned int skip);
+
     bool paused = true;
     bool stepSimulation = false;
     std::string selectedOption = "";

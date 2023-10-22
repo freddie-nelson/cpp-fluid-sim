@@ -31,6 +31,8 @@ namespace Fluid
         float viscosity;
         float surfaceTension;
         float surfaceTensionThreshold;
+
+        bool usePredictedPositions;
     };
 
     struct FluidAttractor
@@ -60,19 +62,21 @@ namespace Fluid
 
         Grid &getGrid();
 
+        float solveDensityAtPoint(const glm::vec2 &point);
+
     private:
+        void solveDensity();
+        void solvePressure();
+        void solvePressureForce();
+        void solveViscosityForce();
+        void solveTensionForce();
+
         void applyGravity(float dt);
         void applySPHForces(float dt);
         void applyAttractors(float dt);
         void applyVelocity(float dt);
 
         void applyBoundingBox();
-
-        void solveDensity();
-        void solvePressure();
-        void solvePressureForce();
-        void solveViscosityForce();
-        void solveTensionForce();
 
         std::vector<ParticleNeighbour> getParticlesOfInfluence(Particle *p, bool usePredictedPositions = false);
 
