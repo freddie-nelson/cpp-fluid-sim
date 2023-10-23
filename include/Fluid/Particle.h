@@ -30,6 +30,7 @@ namespace Fluid
         float density;
         float pressure;
         glm::vec2 pressureForce;
+        glm::vec2 pressureNearForce;
         glm::vec2 viscosityForce;
         glm::vec2 tensionForce;
         glm::vec2 predictedPosition;

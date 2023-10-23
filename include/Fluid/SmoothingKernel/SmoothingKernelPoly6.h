@@ -8,7 +8,7 @@ namespace Fluid
     {
     public:
         float calculate(ParticleDistance *distance, float smoothingRadius);
-        glm::vec2 calculateGradient(ParticleDistance *distance, float smoothingRadius);
+        float calculateGradient(ParticleDistance *distance, float smoothingRadius);
         float calculateLaplacian(ParticleDistance *distance, float smoothingRadius);
     };
 }

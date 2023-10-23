@@ -4,7 +4,6 @@
 #include "./AABB.h"
 #include "./SmoothingKernel/SmoothingKernelPoly6.h"
 #include "./SmoothingKernel/SmoothingKernelSpiky.h"
-#include "./SmoothingKernel/SmoothingKernelViscosity.h"
 
 #include <vector>
 #include <unordered_map>
@@ -24,6 +23,7 @@ namespace Fluid
         AABB boundingBox;
         float boudingBoxRestitution;
 
+        float pressureLimit;
         float smoothingRadius;
         float stiffness;
         float desiredRestDensity;
@@ -67,6 +67,7 @@ namespace Fluid
     private:
         void solveDensityPressure(Particle *p);
         void solvePressureForce(Particle *p);
+        void solvePressureNearForce(Particle *p);
         void solveViscosityForce(Particle *p);
         void solveTensionForce(Particle *p);
 
@@ -93,6 +94,5 @@ namespace Fluid
 
         SmoothingKernelPoly6 smoothingKernelPoly6;
         SmoothingKernelSpiky smoothingKernelSpiky;
-        SmoothingKernelViscosity smoothingKernelViscosity;
     };
 }

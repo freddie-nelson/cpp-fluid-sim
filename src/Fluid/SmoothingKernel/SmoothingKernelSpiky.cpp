@@ -15,16 +15,16 @@ float Fluid::SmoothingKernelSpiky::calculate(ParticleDistance *distance, float s
     return std::pow(h - r, 2) / volume;
 }
 
-glm::vec2 Fluid::SmoothingKernelSpiky::calculateGradient(ParticleDistance *distance, float smoothingRadius)
+float Fluid::SmoothingKernelSpiky::calculateGradient(ParticleDistance *distance, float smoothingRadius)
 {
     float r = distance->distance;
     float h = smoothingRadius;
 
     if (r <= 0.0f || r >= h)
-        return glm::vec2(0, 0);
+        return 0.0f;
 
     float scale = 12 / (std::pow(h, 4) * std::numbers::pi);
-    return (r - h) * scale * distance->direction;
+    return (r - h) * scale;
 }
 
 float Fluid::SmoothingKernelSpiky::calculateLaplacian(ParticleDistance *distance, float smoothingRadius)

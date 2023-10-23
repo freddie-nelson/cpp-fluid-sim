@@ -169,6 +169,11 @@ void Fluid::Fluid::solveDensityPressure(Particle *p)
     }
 
     p->pressure = options.stiffness * (p->density - options.desiredRestDensity);
+
+    // limit pressure to 200
+    // to try and prevent blow ups
+    if (p->pressure > options.pressureLimit)
+        p->pressure = options.pressureLimit;
 }
 
 float Fluid::Fluid::solveDensityAtPoint(const glm::vec2 &point)
@@ -195,12 +200,16 @@ void Fluid::Fluid::solvePressureForce(Particle *p)
     for (auto q : p->neighbours)
     {
         float sharedPressure = (p->pressure + q.particle->pressure) / 2;
-        glm::vec2 smoothing = smoothingKernelSpiky.calculateGradient(&q.distance, options.smoothingRadius);
+        float smoothing = smoothingKernelSpiky.calculateGradient(&q.distance, options.smoothingRadius);
 
-        p->pressureForce += sharedPressure * smoothing * q.particle->mass / q.particle->density;
+        glm::vec2 pressureForce = sharedPressure * q.distance.direction * q.particle->mass / q.particle->density;
+
+        p->pressureForce += pressureForce * smoothing;
+        p->pressureNearForce += pressureForce * static_cast<float>(std::pow(smoothing, 4));
     }
 
     p->pressureForce *= -1;
+    p->pressureNearForce *= -1;
 }
 
 void Fluid::Fluid::solveViscosityForce(Particle *p)
@@ -223,7 +232,7 @@ void Fluid::Fluid::solveTensionForce(Particle *p)
     {
         float colorFieldNoSmoothingKernel = q.particle->mass * (1 / q.particle->density);
 
-        glm::vec2 n = colorFieldNoSmoothingKernel * smoothingKernelPoly6.calculateGradient(&q.distance, options.smoothingRadius);
+        glm::vec2 n = colorFieldNoSmoothingKernel * smoothingKernelPoly6.calculateGradient(&q.distance, options.smoothingRadius) * q.distance.direction;
         float modN = glm::length(n);
 
         if (modN < options.surfaceTensionThreshold)
@@ -248,7 +257,7 @@ void Fluid::Fluid::applySPHForces(Particle *p, float dt)
         return;
     }
 
-    p->velocity += ((p->pressureForce + p->viscosityForce + p->tensionForce) / p->density) * dt;
+    p->velocity += ((p->pressureForce + p->pressureNearForce + p->viscosityForce + p->tensionForce) / p->density) * dt;
 }
 
 void Fluid::Fluid::applyAttractors(Particle *p, float dt)
@@ -266,7 +275,7 @@ void Fluid::Fluid::applyAttractors(Particle *p, float dt)
 
         if (dist < a->radius)
         {
-            p->velocity += -a->strength * smoothingKernelPoly6.calculateGradient(pd, a->radius) * dt;
+            p->velocity += -a->strength * smoothingKernelPoly6.calculateGradient(pd, a->radius) * dir * dt;
         }
 
         delete pd;

@@ -109,8 +109,9 @@ int Application::init()
         },
         boudingBoxRestitution : 0.05f,
 
+        pressureLimit : 200.0f,
         smoothingRadius : 50.0f,
-        stiffness : 1.0e6f,
+        stiffness : 0.95e6f,
         desiredRestDensity : 0.000025f,
         particleMass : 0.045f,
         viscosity : 0.13f,
@@ -156,7 +157,7 @@ void Application::render(bool clear)
 
     if (enablePerPixelDensity)
     {
-        renderPerPixelDensity(10);
+        renderPerPixelDensity(20);
     }
 
     // draw particles
@@ -397,8 +398,8 @@ void Application::addSimulationControls()
 
 void Application::createFluidInteractionListener()
 {
-    float radius = 200.0f;
-    float strength = options.stiffness * (options.stiffness * 0.025f);
+    float radius = 260.0f;
+    float strength = options.stiffness * (options.stiffness * 0.036f);
 
     attractor = new Fluid::FluidAttractor{
         position : glm::vec2(0, 0),

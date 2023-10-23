@@ -17,17 +17,17 @@ float Fluid::SmoothingKernelPoly6::calculate(ParticleDistance *distance, float s
     return std::pow(value, 3) / volume;
 }
 
-glm::vec2 Fluid::SmoothingKernelPoly6::calculateGradient(ParticleDistance *distance, float smoothingRadius)
+float Fluid::SmoothingKernelPoly6::calculateGradient(ParticleDistance *distance, float smoothingRadius)
 {
     float r = distance->distance;
     float h = smoothingRadius;
 
     if (r >= h)
-        return glm::vec2(0, 0);
+        return 0.0f;
 
     float f = std::pow(h, 2) - std::pow(r, 2);
     float scale = -24 / (std::numbers::pi * std::pow(h, 8));
-    return scale * r * static_cast<float>(std::pow(f, 2)) * distance->direction;
+    return scale * r * static_cast<float>(std::pow(f, 2));
 }
 
 float Fluid::SmoothingKernelPoly6::calculateLaplacian(ParticleDistance *distance, float smoothingRadius)

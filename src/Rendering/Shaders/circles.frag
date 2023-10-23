@@ -24,8 +24,9 @@ void main() {
         float sqrDist = xDiff * xDiff + yDiff * yDiff;
         if (sqrDist <= sqrRadius) {
             outColor = u_Colors[i];
-            break;
+            return;
         }
 	} 
 
+    outColor = vec4(0.0, 0.0, 0.0, 0.0);
 }
