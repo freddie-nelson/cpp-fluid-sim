@@ -5,6 +5,7 @@
 #include <iostream>
 #include <numbers>
 #include <chrono>
+#include <thread>
 
 Fluid::Fluid::Fluid(FluidOptions &options) : options(options)
 {
@@ -78,10 +79,10 @@ void Fluid::Fluid::update(float dt)
         // update mass and radius
         p->mass = options.particleMass;
         p->radius = options.particleRadius;
-
-        // precompute neighbours
-        p->neighbours = getParticlesOfInfluence(p, options.usePredictedPositions);
     }
+
+    findNeighbours(options.usePredictedPositions);
+
     // end = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     // std::cout << "get neighbours: " << end - start << "ms" << std::endl;
 
@@ -314,6 +315,73 @@ void Fluid::Fluid::applyBoundingBox(Particle *p)
     }
 }
 
+void Fluid::Fluid::findNeighbours(bool usePredictedPositions)
+{
+    // grid is split into threadCount sections horizontally
+    const int threadCount = 4;
+    const auto gridDimensions = getGridDimensions();
+    const glm::vec2 cellSectionSize(std::floor(gridDimensions.x / threadCount), gridDimensions.y);
+
+    std::thread threads[threadCount];
+
+    auto halfSize = cellSectionSize;
+    halfSize.x = std::floor(halfSize.x / 2);
+
+    // split each section into half so that we don't
+    // read cells on boundaries of 2 sections at the same time
+    for (int halfIndex = 0; halfIndex < 2; halfIndex++)
+    {
+        glm::vec2 startingCell(0, 0);
+
+        for (int i = 0; i < threadCount; i++)
+        {
+            auto start = startingCell;
+
+            // add half of the section size to the starting cell
+            // when we're on the second half of the section
+            // and add one on second half to not read the same cell twice
+            start.x += halfSize.x * halfIndex + halfIndex;
+
+            auto end = start + halfSize;
+
+            // make sure end doesn't go out of section bounds
+            end.x = std::min(end.x, startingCell.x + cellSectionSize.x - 1);
+
+            // std::cout
+            //     << "starting cell: " << start.x << ", " << start.y << std::endl;
+            // std::cout << "ending cell: " << end.x << ", " << end.y << std::endl;
+
+            threads[i] = std::thread(&Fluid::Fluid::findNeighboursThread, this, start, end, i, usePredictedPositions);
+            // threads[i].join();
+
+            startingCell.x += cellSectionSize.x;
+        }
+
+        for (int i = 0; i < threadCount; i++)
+        {
+            threads[i].join();
+        }
+    }
+}
+
+void Fluid::Fluid::findNeighboursThread(glm::vec2 startingCell, glm::vec2 endingCell, int threadIndex, bool usePredictedPositions)
+{
+    for (int x = startingCell.x; x <= endingCell.x; x++)
+    {
+        for (int y = startingCell.y; y <= endingCell.y; y++)
+        {
+            auto gridKey = std::make_pair(x, y);
+            if (grid[gridKey].size() == 0)
+                continue;
+
+            for (Particle *p : grid[gridKey])
+            {
+                p->neighbours = getParticlesOfInfluence(p, usePredictedPositions);
+            }
+        }
+    }
+}
+
 std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Particle *p, bool usePredictedPosition)
 {
     float smoothingRadiusSqr = options.smoothingRadius * options.smoothingRadius;
@@ -378,7 +446,7 @@ std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Part
                 continue;
 
             auto gridKey = std::make_pair(key.first + xOff, key.second + yOff);
-            if (grid.count(gridKey) == 0)
+            if (grid[gridKey].size() == 0)
                 continue;
 
             for (Particle *q : grid[gridKey])
@@ -412,12 +480,38 @@ std::vector<Fluid::ParticleNeighbour> Fluid::Fluid::getParticlesOfInfluence(Part
 
 void Fluid::Fluid::updateGrid(bool usePredictedPositions)
 {
-    grid.clear();
+    auto gridDimensions = getGridDimensions();
 
+    // create grid if it doesn't exist
+    if (grid.size() == 0 || grid.count(std::make_pair(gridDimensions.x, gridDimensions.y)) == 0)
+    {
+        for (int x = 0; x <= gridDimensions.x; x++)
+        {
+            for (int y = 0; y <= gridDimensions.y; y++)
+            {
+                grid[std::make_pair(x, y)] = std::vector<Particle *>();
+            }
+        }
+    }
+
+    // clear all cells
+    for (auto &cell : grid)
+    {
+        cell.second.clear();
+    }
+
+    // populate grid
     for (Particle *p : particles)
     {
         insertIntoGrid(p, usePredictedPositions);
     }
+}
+
+glm::vec2 Fluid::Fluid::getGridDimensions()
+{
+    return glm::vec2(
+        (options.boundingBox.max.x - options.boundingBox.min.x) / options.smoothingRadius,
+        (options.boundingBox.max.y - options.boundingBox.min.y) / options.smoothingRadius);
 }
 
 void Fluid::Fluid::insertIntoGrid(Particle *p, bool usePredictedPosition)

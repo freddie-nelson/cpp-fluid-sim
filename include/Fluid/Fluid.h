@@ -78,9 +78,14 @@ namespace Fluid
 
         void applyBoundingBox(Particle *p);
 
+        void findNeighbours(bool usePredictedPositions = false);
+        void findNeighboursThread(glm::vec2 startingCell, glm::vec2 cellSectionSize, int threadIndex, bool usePredictedPositions = false);
+
         std::vector<ParticleNeighbour> getParticlesOfInfluence(Particle *p, bool usePredictedPositions = false);
 
         void updateGrid(bool usePredictedPositions = false);
+        glm::vec2 getGridDimensions();
+
         void insertIntoGrid(Particle *p, bool usePredictedPositions = false);
         std::pair<int, int> getGridKey(Particle *p, bool usePredictedPositions = false);
 

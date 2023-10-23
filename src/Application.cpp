@@ -96,7 +96,7 @@ int Application::init()
 
     // init fluid
     options = Fluid::FluidOptions{
-        numParticles : 900,
+        numParticles : 1200,
         particleRadius : 5,
         particleSpacing : 5,
         initialCentre : glm::vec2(windowWidth / 2, windowHeight / 2),
