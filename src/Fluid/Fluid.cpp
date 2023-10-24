@@ -318,43 +318,55 @@ void Fluid::Fluid::applyBoundingBox(Particle *p)
 void Fluid::Fluid::findNeighbours(bool usePredictedPositions)
 {
     // grid is split into threadCount sections horizontally
-    const int threadCount = 4;
-    const auto gridDimensions = getGridDimensions();
+    const int threadCount = 8;
+    const glm::vec2 gridDimensions = getGridDimensions();
     const glm::vec2 cellSectionSize(std::floor(gridDimensions.x / threadCount), gridDimensions.y);
+
+    int leftOverX = static_cast<int>(gridDimensions.x) % threadCount;
 
     std::thread threads[threadCount];
 
     auto halfSize = cellSectionSize;
     halfSize.x = std::floor(halfSize.x / 2);
 
+    // std::cout << "grid dimensions:" << gridDimensions.x << "," << gridDimensions.y << std::endl;
+    // std::cout << "cell section size:" << cellSectionSize.x << "," << cellSectionSize.y << std::endl;
+    // std::cout << "halfSize:" << halfSize.x << "," << halfSize.y << std::endl;
+    // std::cout << "left over x:" << leftOverX << std::endl;
+
+    glm::vec2 current = glm::vec2(0, 0);
+    int start[threadCount * 2];
+    int end[threadCount * 2];
+
+    for (int i = 0; i < threadCount * 2; i++)
+    {
+        int halfIndex = i % 2;
+        int size = halfSize.x + halfIndex;
+
+        if (halfIndex == 0 && leftOverX > 0)
+        {
+            size += 1;
+            leftOverX -= 1;
+        }
+
+        start[i] = current.x;
+        current.x += size;
+        end[i] = current.x - 1;
+    }
+
     // split each section into half so that we don't
     // read cells on boundaries of 2 sections at the same time
     for (int halfIndex = 0; halfIndex < 2; halfIndex++)
     {
-        glm::vec2 startingCell(0, 0);
-
         for (int i = 0; i < threadCount; i++)
         {
-            auto start = startingCell;
-
-            // add half of the section size to the starting cell
-            // when we're on the second half of the section
-            // and add one on second half to not read the same cell twice
-            start.x += halfSize.x * halfIndex + halfIndex;
-
-            auto end = start + halfSize;
-
-            // make sure end doesn't go out of section bounds
-            end.x = std::min(end.x, startingCell.x + cellSectionSize.x - 1);
+            int index = i * 2 + halfIndex;
 
             // std::cout
-            //     << "starting cell: " << start.x << ", " << start.y << std::endl;
-            // std::cout << "ending cell: " << end.x << ", " << end.y << std::endl;
+            //     << "starting cell: " << start[index] << std::endl;
+            // std::cout << "ending cell: " << end[index] << std::endl;
 
-            threads[i] = std::thread(&Fluid::Fluid::findNeighboursThread, this, start, end, i, usePredictedPositions);
-            // threads[i].join();
-
-            startingCell.x += cellSectionSize.x;
+            threads[i] = std::thread(&Fluid::Fluid::findNeighboursThread, this, glm::vec2(start[index], 0), glm::vec2(end[index], gridDimensions.y), i, usePredictedPositions);
         }
 
         for (int i = 0; i < threadCount; i++)
