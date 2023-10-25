@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 #include <boost/functional/hash.hpp>
+#include <functional>
 
 namespace Fluid
 {
@@ -33,6 +34,7 @@ namespace Fluid
         float surfaceTensionThreshold;
 
         bool usePredictedPositions;
+        int numThreads;
     };
 
     struct FluidAttractor
@@ -78,8 +80,13 @@ namespace Fluid
 
         void applyBoundingBox(Particle *p);
 
-        void findNeighbours(bool usePredictedPositions = false);
-        void findNeighboursThread(glm::vec2 startingCell, glm::vec2 cellSectionSize, int threadIndex, bool usePredictedPositions = false);
+        void iterateGridCellsThreaded(void (Fluid::*func)(glm::vec2, glm::vec2, int), const int numThreads = 4);
+        void findNeighboursThread(glm::vec2 startingCell, glm::vec2 endingCell, int threadIndex);
+
+        void iterateParticlesThreaded(void (Fluid::*func)(int, int, int), const int numThreads = 4);
+        void solveDensityPressureThread(int startingParticle, int endingParticle, int threadIndex);
+        void solveForcesThread(int startingParticle, int endingParticle, int threadIndex);
+        void applyForcesThread(int startingParticle, int endingParticle, int threadIndex);
 
         std::vector<ParticleNeighbour> getParticlesOfInfluence(Particle *p, bool usePredictedPositions = false);
 
@@ -99,5 +106,7 @@ namespace Fluid
 
         SmoothingKernelPoly6 smoothingKernelPoly6;
         SmoothingKernelSpiky smoothingKernelSpiky;
+
+        float dt;
     };
 }

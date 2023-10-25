@@ -55,6 +55,8 @@ void Fluid::Fluid::init()
 
 void Fluid::Fluid::update(float dt)
 {
+    // store dt for threads
+    this->dt = dt;
 
     // pre solve
     for (auto p : particles)
@@ -68,12 +70,13 @@ void Fluid::Fluid::update(float dt)
 
     // update grid
     // int start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
     updateGrid(options.usePredictedPositions);
+
     // int end = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     // std::cout << std::endl
     //           << "update grid: " << end - start << "ms" << std::endl;
 
-    // start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     for (auto p : particles)
     {
         // update mass and radius
@@ -81,38 +84,26 @@ void Fluid::Fluid::update(float dt)
         p->radius = options.particleRadius;
     }
 
-    findNeighbours(options.usePredictedPositions);
+    // start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+    iterateGridCellsThreaded(&Fluid::findNeighboursThread, options.numThreads);
 
     // end = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     // std::cout << "get neighbours: " << end - start << "ms" << std::endl;
 
     // solve
     // start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    for (auto p : particles)
-    {
-        solveDensityPressure(p);
-    }
+
+    iterateParticlesThreaded(&Fluid::solveDensityPressureThread, options.numThreads);
 
     // solve forces
-    for (auto p : particles)
-    {
-        solvePressureForce(p);
-        solveViscosityForce(p);
-        // solveTensionForce(p);
-    }
+    iterateParticlesThreaded(&Fluid::solveForcesThread, options.numThreads);
 
-    // end = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     // end = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     // std::cout << "solve: " << end - start << "ms" << std::endl;
 
     // apply forces
-    for (auto p : particles)
-    {
-        applySPHForces(p, dt);
-        applyAttractors(p, dt);
-        applyVelocity(p, dt);
-        applyBoundingBox(p);
-    }
+    iterateParticlesThreaded(&Fluid::applyForcesThread, options.numThreads);
 }
 
 std::vector<Fluid::Particle *> &Fluid::Fluid::getParticles()
@@ -315,16 +306,15 @@ void Fluid::Fluid::applyBoundingBox(Particle *p)
     }
 }
 
-void Fluid::Fluid::findNeighbours(bool usePredictedPositions)
+void Fluid::Fluid::iterateGridCellsThreaded(void (Fluid::*func)(glm::vec2, glm::vec2, int), const int numThreads)
 {
-    // grid is split into threadCount sections horizontally
-    const int threadCount = 8;
+    // grid is split into numThreads sections horizontally
     const glm::vec2 gridDimensions = getGridDimensions();
-    const glm::vec2 cellSectionSize(std::floor(gridDimensions.x / threadCount), gridDimensions.y);
+    const glm::vec2 cellSectionSize(std::floor(gridDimensions.x / numThreads), gridDimensions.y);
 
-    int leftOverX = static_cast<int>(gridDimensions.x) % threadCount;
+    int leftOverX = static_cast<int>(gridDimensions.x) % numThreads;
 
-    std::thread threads[threadCount];
+    std::thread threads[numThreads];
 
     auto halfSize = cellSectionSize;
     halfSize.x = std::floor(halfSize.x / 2);
@@ -335,10 +325,10 @@ void Fluid::Fluid::findNeighbours(bool usePredictedPositions)
     // std::cout << "left over x:" << leftOverX << std::endl;
 
     glm::vec2 current = glm::vec2(0, 0);
-    int start[threadCount * 2];
-    int end[threadCount * 2];
+    int start[numThreads * 2];
+    int end[numThreads * 2];
 
-    for (int i = 0; i < threadCount * 2; i++)
+    for (int i = 0; i < numThreads * 2; i++)
     {
         int halfIndex = i % 2;
         int size = halfSize.x + halfIndex;
@@ -358,7 +348,7 @@ void Fluid::Fluid::findNeighbours(bool usePredictedPositions)
     // read cells on boundaries of 2 sections at the same time
     for (int halfIndex = 0; halfIndex < 2; halfIndex++)
     {
-        for (int i = 0; i < threadCount; i++)
+        for (int i = 0; i < numThreads; i++)
         {
             int index = i * 2 + halfIndex;
 
@@ -366,17 +356,17 @@ void Fluid::Fluid::findNeighbours(bool usePredictedPositions)
             //     << "starting cell: " << start[index] << std::endl;
             // std::cout << "ending cell: " << end[index] << std::endl;
 
-            threads[i] = std::thread(&Fluid::Fluid::findNeighboursThread, this, glm::vec2(start[index], 0), glm::vec2(end[index], gridDimensions.y), i, usePredictedPositions);
+            threads[i] = std::thread(func, this, glm::vec2(start[index], 0), glm::vec2(end[index], gridDimensions.y), i);
         }
 
-        for (int i = 0; i < threadCount; i++)
+        for (int i = 0; i < numThreads; i++)
         {
             threads[i].join();
         }
     }
 }
 
-void Fluid::Fluid::findNeighboursThread(glm::vec2 startingCell, glm::vec2 endingCell, int threadIndex, bool usePredictedPositions)
+void Fluid::Fluid::findNeighboursThread(glm::vec2 startingCell, glm::vec2 endingCell, int threadIndex)
 {
     for (int x = startingCell.x; x <= endingCell.x; x++)
     {
@@ -388,9 +378,60 @@ void Fluid::Fluid::findNeighboursThread(glm::vec2 startingCell, glm::vec2 ending
 
             for (Particle *p : grid[gridKey])
             {
-                p->neighbours = getParticlesOfInfluence(p, usePredictedPositions);
+                p->neighbours = getParticlesOfInfluence(p, options.usePredictedPositions);
             }
         }
+    }
+}
+
+void Fluid::Fluid::iterateParticlesThreaded(void (Fluid::*func)(int, int, int), const int numThreads)
+{
+    std::thread threads[numThreads];
+    int perThread = particles.size() / numThreads;
+
+    for (int i = 0; i < numThreads; i++)
+    {
+        int start = i * perThread;
+        int end = std::min(start + perThread - 1, static_cast<int>(particles.size()) - 1);
+
+        threads[i] = std::thread(func, this, start, end, i);
+    }
+
+    for (int i = 0; i < numThreads; i++)
+    {
+        threads[i].join();
+    }
+}
+
+void Fluid::Fluid::solveDensityPressureThread(int startingParticle, int endingParticle, int threadIndex)
+{
+    for (int i = startingParticle; i <= endingParticle; i++)
+    {
+        auto p = particles[i];
+        solveDensityPressure(p);
+    }
+}
+
+void Fluid::Fluid::solveForcesThread(int startingParticle, int endingParticle, int threadIndex)
+{
+    for (int i = startingParticle; i <= endingParticle; i++)
+    {
+        auto p = particles[i];
+        solvePressureForce(p);
+        solveViscosityForce(p);
+        // solveTensionForce(p);
+    }
+}
+
+void Fluid::Fluid::applyForcesThread(int startingParticle, int endingParticle, int threadIndex)
+{
+    for (int i = startingParticle; i <= endingParticle; i++)
+    {
+        auto p = particles[i];
+        applySPHForces(p, dt);
+        applyAttractors(p, dt);
+        applyVelocity(p, dt);
+        applyBoundingBox(p);
     }
 }
 

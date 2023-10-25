@@ -119,6 +119,7 @@ int Application::init()
         surfaceTensionThreshold : 0.0f,
 
         usePredictedPositions : true,
+        numThreads : 4,
     };
 
     fluid = new Fluid::Fluid(options);
